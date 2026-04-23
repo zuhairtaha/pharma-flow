@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { Icon, IconButton } from './UI';
+import { Button, ConfirmDialog, Icon, IconButton, Modal } from './UI';
 import { useData } from '../store/DataContext';
+import type { Database } from '../types';
 
 interface NavItem {
   to: string;
@@ -32,8 +33,59 @@ export default function Layout() {
     }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { db } = useData();
+  const { db, setDb, exportJson } = useData();
   const navigate = useNavigate();
+
+  // تصدير/استيراد قاعدة البيانات (JSON مخزّن في localStorage)
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingImport, setPendingImport] = useState<Database | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedAt, setImportedAt] = useState<number | null>(null);
+
+  const handleExport = () => {
+    const blob = new Blob([exportJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pharmaflow-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result;
+        if (typeof text !== 'string') throw new Error('تعذّر قراءة الملف');
+        const data = JSON.parse(text);
+        if (!data?.settings || !Array.isArray(data?.products)) {
+          throw new Error('صيغة الملف غير متوافقة مع بنية التطبيق');
+        }
+        setPendingImport(data as Database);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : 'تعذّر قراءة الملف');
+      }
+    };
+    reader.readAsText(file);
+    // يسمح باختيار نفس الملف مرة أخرى لاحقاً
+    e.target.value = '';
+  };
+
+  const confirmImport = () => {
+    if (!pendingImport) return;
+    setDb(pendingImport);
+    setPendingImport(null);
+    setImportedAt(Date.now());
+  };
+
+  useEffect(() => {
+    if (importedAt === null) return;
+    const t = setTimeout(() => setImportedAt(null), 3500);
+    return () => clearTimeout(t);
+  }, [importedAt]);
 
   useEffect(() => {
     try {
@@ -194,6 +246,30 @@ export default function Layout() {
             </span>
           </div>
           <div className="flex-1" />
+
+          {/* تصدير / استيراد قاعدة البيانات — متاح من كل صفحة */}
+          <div className="flex items-center" role="group" aria-label="نسخ احتياطي">
+            <IconButton
+              name="cloud_download"
+              label="تصدير قاعدة البيانات (JSON)"
+              onClick={handleExport}
+            />
+            <IconButton
+              name="cloud_upload"
+              label="استيراد قاعدة البيانات (JSON)"
+              onClick={() => fileInputRef.current?.click()}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+          </div>
+
+          <div className="hidden sm:block h-6 w-px bg-[var(--color-outline-variant)] mx-1" />
+
           <IconButton name="refresh" label="تحديث" onClick={() => window.location.reload()} />
           <IconButton name="settings" label="الإعدادات" onClick={() => navigate('/settings')} />
         </header>
@@ -204,6 +280,46 @@ export default function Layout() {
           </div>
         </main>
       </div>
+
+      {/* تأكيد الاستيراد */}
+      <ConfirmDialog
+        open={!!pendingImport}
+        onClose={() => setPendingImport(null)}
+        onConfirm={confirmImport}
+        title="استيراد قاعدة البيانات"
+        message="سيتم استبدال بيانات التطبيق الحالية بالكامل بمحتوى الملف المختار، وتُحفظ في ذاكرة المتصفح (localStorage). هل تريد المتابعة؟"
+        confirmLabel="استيراد واستبدال"
+        danger
+      />
+
+      {/* رسالة خطأ عند فشل الاستيراد */}
+      <Modal
+        open={!!importError}
+        onClose={() => setImportError(null)}
+        title="تعذّر استيراد الملف"
+        size="sm"
+        footer={
+          <Button onClick={() => setImportError(null)} icon="check">
+            حسناً
+          </Button>
+        }
+      >
+        <div className="flex items-start gap-3 text-sm">
+          <Icon name="error" className="text-[var(--color-error)] text-[22px]" filled />
+          <p className="text-[var(--color-on-surface-variant)] leading-6">{importError}</p>
+        </div>
+      </Modal>
+
+      {/* إشعار نجاح الاستيراد */}
+      {importedAt !== null ? (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-full elev-3 bg-[var(--color-success-container)] text-[var(--color-success)] text-sm font-semibold flex items-center gap-2 animate-fade-in"
+        >
+          <Icon name="check_circle" filled />
+          تمّ استيراد قاعدة البيانات بنجاح
+        </div>
+      ) : null}
     </div>
   );
 }
