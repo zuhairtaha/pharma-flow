@@ -42,6 +42,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # يُفعِّل GitHub Pages تلقائياً عند أول تشغيل إن لم تكن مُفعَّلة،
+          # ويضبط Source إلى GitHub Actions — فلا حاجة للمرور من Settings.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
