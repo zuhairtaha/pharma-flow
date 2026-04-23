@@ -270,7 +270,6 @@ export default function Layout() {
 
           <div className="hidden sm:block h-6 w-px bg-[var(--color-outline-variant)] mx-1" />
 
-          <IconButton name="refresh" label="تحديث" onClick={() => window.location.reload()} />
           <IconButton name="settings" label="الإعدادات" onClick={() => navigate('/settings')} />
         </header>
 
