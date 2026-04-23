@@ -18,6 +18,7 @@ import {
 import { useData } from '../store/DataContext';
 import { invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
 import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
 import type { Customer, Invoice, PaymentType } from '../types';
 
 export default function Invoices() {
@@ -45,15 +46,33 @@ export default function Invoices() {
     }
     if (paymentFilter) list = list.filter((i) => i.paymentType === paymentFilter);
     if (customerFilter) list = list.filter((i) => i.customerId === customerFilter);
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, search, paymentFilter, customerFilter, customers]);
 
+  const comparators = useMemo<Comparators<Invoice>>(() => {
+    const nameOf = (id: string) => customers.find((c) => c.id === id)?.name ?? '';
+    return {
+      number: strCmp((i) => i.number),
+      customer: (a, b) => nameOf(a.customerId).localeCompare(nameOf(b.customerId), 'ar'),
+      date: strCmp((i) => i.date),
+      itemCount: (a, b) => (a.items?.length || 0) - (b.items?.length || 0),
+      total: (a, b) => invoiceTotalUsd(a) - invoiceTotalUsd(b),
+      remaining: (a, b) => invoiceRemainingUsd(a) - invoiceRemainingUsd(b),
+      paymentType: strCmp((i) => i.paymentType),
+    };
+  }, [customers]);
+
+  const { sorted: rows, sortProps } = useSortable(filtered, comparators, {
+    key: 'date',
+    dir: 'desc',
+  });
+
   const totals = useMemo(() => {
-    const gross = filtered.reduce((s, inv) => s + invoiceTotalUsd(inv), 0);
-    const remaining = filtered.reduce((s, inv) => s + invoiceRemainingUsd(inv), 0);
-    return { gross, remaining, count: filtered.length };
-  }, [filtered]);
+    const gross = rows.reduce((s, inv) => s + invoiceTotalUsd(inv), 0);
+    const remaining = rows.reduce((s, inv) => s + invoiceRemainingUsd(inv), 0);
+    return { gross, remaining, count: rows.length };
+  }, [rows]);
 
   return (
     <div className="space-y-6">
@@ -116,7 +135,7 @@ export default function Invoices() {
         </div>
       </Card>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <Card>
           <EmptyState
             icon="receipt_long"
@@ -135,18 +154,18 @@ export default function Invoices() {
         <Table>
           <thead>
             <tr>
-              <Th>الرقم</Th>
-              <Th>الصيدلية / العميل</Th>
-              <Th>التاريخ</Th>
-              <Th align="center">الأصناف</Th>
-              <Th align="end">الإجمالي</Th>
-              <Th align="end">المتبقي</Th>
-              <Th align="center">النوع</Th>
+              <Th {...sortProps('number')}>الرقم</Th>
+              <Th {...sortProps('customer')}>الصيدلية / العميل</Th>
+              <Th {...sortProps('date')}>التاريخ</Th>
+              <Th align="center" {...sortProps('itemCount')}>الأصناف</Th>
+              <Th align="end" {...sortProps('total')}>الإجمالي</Th>
+              <Th align="end" {...sortProps('remaining')}>المتبقي</Th>
+              <Th align="center" {...sortProps('paymentType')}>النوع</Th>
               <Th align="center">إجراءات</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((inv) => {
+            {rows.map((inv) => {
               const total = invoiceTotalUsd(inv);
               const remaining = invoiceRemainingUsd(inv);
               const cust = customerById(inv.customerId);
@@ -168,7 +187,7 @@ export default function Invoices() {
                       </div>
                     ) : null}
                     {cust?.phone ? (
-                      <div className="text-[11px] text-[var(--color-on-surface-variant)]" dir="ltr">
+                      <div className="text-[11px] text-[var(--color-on-surface-variant)] tabular-nums">
                         {cust.phone}
                       </div>
                     ) : null}

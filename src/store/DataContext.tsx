@@ -12,7 +12,7 @@ import type { CollectionItem, CollectionName, Database, Settings } from '../type
 
 // قاعدة بيانات JSON مستمرة عبر localStorage — تعمل كـ"ملف JSON" للتطبيق.
 // عند تغيير شكل البيانات (رفع الإصدار) يُتجاهل المحتوى القديم ويُحمَّل الـ seed الجديد.
-const STORAGE_KEY = 'pharmaflow.db.v3';
+const STORAGE_KEY = 'pharmaflow.db.v4';
 
 const loadDb = (): Database => {
   try {

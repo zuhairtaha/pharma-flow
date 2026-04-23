@@ -96,7 +96,7 @@ export default function InvoiceView() {
               {settings.phone ? (
                 <div className="flex items-center gap-1">
                   <Icon name="call" className="text-[14px]" />
-                  <span dir="ltr">{settings.phone}</span>
+                  <span className="tabular-nums">{settings.phone}</span>
                 </div>
               ) : null}
             </div>
@@ -126,7 +126,7 @@ export default function InvoiceView() {
             ) : null}
             {customer?.phone ? (
               <div className="text-xs mt-1">
-                <Icon name="call" className="text-[14px]" /> <span dir="ltr">{customer.phone}</span>
+                <Icon name="call" className="text-[14px]" /> <span className="tabular-nums">{customer.phone}</span>
               </div>
             ) : null}
             {customer?.address ? (

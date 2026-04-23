@@ -24,6 +24,7 @@ import {
   worstSupplierPrice,
 } from '../utils/calc';
 import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
 import type { Product, Settings, Supplier, SupplierPrice } from '../types';
 
 type ProductDraft = Omit<Product, 'id'> & { id: string };
@@ -48,7 +49,6 @@ export default function Inventory() {
   const [search, setSearch] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
-  const [showBestPrice, setShowBestPrice] = useState(false);
   const [editing, setEditing] = useState<ProductDraft | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
 
@@ -71,15 +71,39 @@ export default function Inventory() {
     if (filterSource) list = list.filter((p) => p.source === filterSource);
     if (filterSupplier)
       list = list.filter((p) => p.prices?.some((pp) => pp.supplierId === filterSupplier));
-    if (showBestPrice) {
-      list = [...list].sort((a, b) => {
-        const ab = bestSupplierPrice(a)?.priceUsd ?? Infinity;
-        const bb = bestSupplierPrice(b)?.priceUsd ?? Infinity;
-        return ab - bb;
-      });
-    }
     return list;
-  }, [products, search, filterSource, filterSupplier, showBestPrice]);
+  }, [products, search, filterSource, filterSupplier]);
+
+  const comparators = useMemo<Comparators<Product>>(
+    () => ({
+      name: strCmp((p) => p.name),
+      barcode: strCmp((p) => p.barcode),
+      source: strCmp((p) => p.source),
+      quantity: (a, b) => (a.quantity || 0) - (b.quantity || 0),
+      bestPrice: (a, b) =>
+        (bestSupplierPrice(a)?.priceUsd ?? Infinity) -
+        (bestSupplierPrice(b)?.priceUsd ?? Infinity),
+      pharmacyPrice: (a, b) => {
+        const ap = bestSupplierPrice(a)?.priceUsd ?? Infinity;
+        const bp = bestSupplierPrice(b)?.priceUsd ?? Infinity;
+        return (
+          ap * (1 + (a.profitPharmacy || 0) / 100) -
+          bp * (1 + (b.profitPharmacy || 0) / 100)
+        );
+      },
+      distPrice: (a, b) => {
+        const ap = bestSupplierPrice(a)?.priceUsd ?? Infinity;
+        const bp = bestSupplierPrice(b)?.priceUsd ?? Infinity;
+        return (
+          ap * (1 + (a.profitDist || 0) / 100) - bp * (1 + (b.profitDist || 0) / 100)
+        );
+      },
+      expiry: strCmp((p) => p.expiry),
+    }),
+    [],
+  );
+
+  const { sorted: rows, sortProps } = useSortable(filtered, comparators);
 
   const onSave = (prod: ProductDraft) => {
     if (prod.id && products.some((p) => p.id === prod.id)) {
@@ -106,7 +130,7 @@ export default function Inventory() {
       />
 
       <Card className="!p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <TextField
             placeholder="بحث بالاسم أو الباركود..."
             icon="search"
@@ -127,19 +151,14 @@ export default function Inventory() {
             onChange={(e) => setFilterSupplier(e.target.value)}
             options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
           />
-          <label className="flex items-center gap-2 px-3 rounded-xl border border-[var(--color-outline-variant)] cursor-pointer md-state">
-            <input
-              type="checkbox"
-              checked={showBestPrice}
-              onChange={(e) => setShowBestPrice(e.target.checked)}
-              className="accent-[var(--color-primary)] h-4 w-4"
-            />
-            <span className="text-sm text-[var(--color-on-surface)]">فرز حسب الأرخص</span>
-          </label>
         </div>
+        <p className="text-xs text-[var(--color-on-surface-variant)] mt-3 flex items-center gap-1">
+          <Icon name="info" className="text-[14px]" />
+          يمكنك النقر على أيّ عمود لفرز الجدول تصاعدياً أو تنازلياً.
+        </p>
       </Card>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <Card>
           <EmptyState
             icon="inventory_2"
@@ -151,19 +170,19 @@ export default function Inventory() {
         <Table>
           <thead>
             <tr>
-              <Th>الصنف</Th>
-              <Th>الباركود</Th>
-              <Th>المصدر</Th>
-              <Th align="center">الكمية</Th>
-              <Th align="end">أفضل سعر شراء</Th>
-              <Th align="end">سعر البيع للصيدلية</Th>
-              <Th align="end">سعر التوزيع (جملة)</Th>
-              <Th align="center">الصلاحية</Th>
+              <Th {...sortProps('name')}>الصنف</Th>
+              <Th {...sortProps('barcode')}>الباركود</Th>
+              <Th {...sortProps('source')}>المصدر</Th>
+              <Th align="center" {...sortProps('quantity')}>الكمية</Th>
+              <Th align="end" {...sortProps('bestPrice')}>أفضل سعر شراء</Th>
+              <Th align="end" {...sortProps('pharmacyPrice')}>سعر البيع للصيدلية</Th>
+              <Th align="end" {...sortProps('distPrice')}>سعر التوزيع (جملة)</Th>
+              <Th align="center" {...sortProps('expiry')}>الصلاحية</Th>
               <Th align="center">الإجراءات</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p) => {
+            {rows.map((p) => {
               const best = bestSupplierPrice(p);
               const worst = worstSupplierPrice(p);
               const retailUsd = best ? sellPriceUsd(best.priceUsd, p.profitPharmacy) : 0;

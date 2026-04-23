@@ -18,6 +18,7 @@ import {
 import { useData } from '../store/DataContext';
 import { customerBalanceUsd, genId } from '../utils/calc';
 import { fmtSyp, fmtUsd } from '../utils/format';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
 import type { Customer } from '../types';
 
 const emptyCustomer: Customer = {
@@ -46,6 +47,25 @@ export default function Customers() {
         c.address?.toLowerCase().includes(q),
     );
   }, [customers, search]);
+
+  const comparators = useMemo<Comparators<Customer>>(
+    () => ({
+      name: strCmp((c) => c.name),
+      phone: strCmp((c) => c.phone),
+      address: strCmp((c) => c.address),
+      invoiceCount: (a, b) => {
+        const ac = invoices.filter((i) => i.customerId === a.id).length;
+        const bc = invoices.filter((i) => i.customerId === b.id).length;
+        return ac - bc;
+      },
+      balance: (a, b) =>
+        customerBalanceUsd(a.id, invoices, customerPayments) -
+        customerBalanceUsd(b.id, invoices, customerPayments),
+    }),
+    [invoices, customerPayments],
+  );
+
+  const { sorted: rows, sortProps } = useSortable(filtered, comparators);
 
   const save = (cust: Customer) => {
     if (cust.id && customers.some((c) => c.id === cust.id)) {
@@ -78,7 +98,7 @@ export default function Customers() {
         />
       </Card>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <Card>
           <EmptyState icon="groups" title="لا يوجد عملاء" />
         </Card>
@@ -86,16 +106,16 @@ export default function Customers() {
         <Table>
           <thead>
             <tr>
-              <Th>الاسم</Th>
-              <Th>الهاتف</Th>
-              <Th>العنوان</Th>
-              <Th align="center">الفواتير</Th>
-              <Th align="end">الرصيد</Th>
+              <Th {...sortProps('name')}>الاسم</Th>
+              <Th {...sortProps('phone')}>الهاتف</Th>
+              <Th {...sortProps('address')}>العنوان</Th>
+              <Th align="center" {...sortProps('invoiceCount')}>الفواتير</Th>
+              <Th align="end" {...sortProps('balance')}>الرصيد</Th>
               <Th align="center">الإجراءات</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => {
+            {rows.map((c) => {
               const balance = customerBalanceUsd(c.id, invoices, customerPayments);
               const invoiceCount = invoices.filter((i) => i.customerId === c.id).length;
               return (
@@ -122,9 +142,7 @@ export default function Customers() {
                   </Td>
                   <Td>
                     {c.phone ? (
-                      <span dir="ltr" className="text-xs tabular-nums">
-                        {c.phone}
-                      </span>
+                      <span className="text-xs tabular-nums">{c.phone}</span>
                     ) : (
                       '—'
                     )}
@@ -247,7 +265,7 @@ function CustomerEditor({ customer, onClose, onSave }: CustomerEditorProps) {
           icon="call"
           value={form.phone}
           onChange={(e) => patch({ phone: e.target.value })}
-          placeholder="+963-9..."
+          placeholder="09XXXXXXXX"
         />
         <TextField
           label="العنوان"

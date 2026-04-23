@@ -12,6 +12,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
+import type { SortDirection } from '../hooks/useSortable';
 
 // ---------- Icon ----------
 export interface IconProps {
@@ -611,16 +612,41 @@ export interface CellProps {
   align?: 'start' | 'end' | 'center';
 }
 
-export function Th({ children, className = '', align }: CellProps) {
-  return (
-    <th
-      className={`px-4 py-3 text-xs font-semibold text-[var(--color-on-surface-variant)] bg-[var(--color-surface-dim)] ${
-        align === 'end' ? 'text-end' : align === 'center' ? 'text-center' : 'text-start'
-      } ${className}`}
-    >
-      {children}
-    </th>
-  );
+export interface ThProps extends CellProps {
+  sortKey?: string;
+  sortDir?: SortDirection | null;
+  onSort?: (key: string) => void;
+}
+
+export function Th({ children, className = '', align, sortKey, sortDir, onSort }: ThProps) {
+  const alignClass =
+    align === 'end' ? 'text-end' : align === 'center' ? 'text-center' : 'text-start';
+  const justifyClass =
+    align === 'end' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
+  const baseClass = `px-4 py-3 text-xs font-semibold text-[var(--color-on-surface-variant)] bg-[var(--color-surface-dim)] ${alignClass} ${className}`;
+
+  if (sortKey && onSort) {
+    const active = sortDir != null;
+    const iconName =
+      sortDir === 'asc' ? 'arrow_upward' : sortDir === 'desc' ? 'arrow_downward' : 'unfold_more';
+    return (
+      <th className={`${baseClass} cursor-pointer select-none`} aria-sort={sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : 'none'}>
+        <button
+          type="button"
+          onClick={() => onSort(sortKey)}
+          className={`md-state inline-flex items-center gap-1 rounded-md py-0.5 w-full ${justifyClass} text-current font-semibold hover:text-[var(--color-on-surface)] transition-colors`}
+        >
+          <span>{children}</span>
+          <Icon
+            name={iconName}
+            className={`text-[14px] ${active ? 'text-[var(--color-primary)]' : 'opacity-40'}`}
+          />
+        </button>
+      </th>
+    );
+  }
+
+  return <th className={baseClass}>{children}</th>;
 }
 
 export function Td({ children, className = '', align }: CellProps) {

@@ -105,9 +105,7 @@ export default function Suppliers() {
                   {sup.phone ? (
                     <li className="flex items-center gap-2">
                       <Icon name="call" className="text-[16px]" />
-                      <span dir="ltr" className="tabular-nums">
-                        {sup.phone}
-                      </span>
+                      <span className="tabular-nums">{sup.phone}</span>
                     </li>
                   ) : null}
                   {sup.address ? (

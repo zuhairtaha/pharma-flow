@@ -21,7 +21,10 @@ import {
   fmtSyp,
   fmtUsd,
 } from '../utils/format';
-import type { ExpiryLevel } from '../types';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import type { ExpiryLevel, Product, Supplier } from '../types';
+
+type ExpiryRow = Product & { status: ReturnType<typeof expiryStatus> };
 
 const LEVEL_ORDER: Record<ExpiryLevel, number> = {
   expired: 0,
@@ -38,7 +41,7 @@ export default function Expiry() {
   const [levelFilter, setLevelFilter] = useState<'' | ExpiryLevel>('');
   const [thresholdDays, setThresholdDays] = useState<number>(settings.nearExpiryDays);
 
-  const rows = useMemo(() => {
+  const filtered = useMemo<ExpiryRow[]>(() => {
     const q = search.trim().toLowerCase();
     return products
       .map((p) => ({ ...p, status: expiryStatus(p.expiry, thresholdDays) }))
@@ -46,13 +49,41 @@ export default function Expiry() {
         if (q && !(p.name.toLowerCase().includes(q) || p.barcode?.includes(q))) return false;
         if (levelFilter && p.status.level !== levelFilter) return false;
         return true;
-      })
-      .sort((a, b) => {
+      });
+  }, [products, search, levelFilter, thresholdDays]);
+
+  const supplierNameById = (id: string) => suppliers.find((s: Supplier) => s.id === id)?.name ?? '';
+
+  const comparators = useMemo<Comparators<ExpiryRow>>(
+    () => ({
+      name: strCmp((p) => p.name),
+      supplier: (a, b) => {
+        const aName = supplierNameById(bestSupplierPrice(a)?.supplierId ?? '');
+        const bName = supplierNameById(bestSupplierPrice(b)?.supplierId ?? '');
+        return aName.localeCompare(bName, 'ar');
+      },
+      quantity: (a, b) => (a.quantity || 0) - (b.quantity || 0),
+      expiry: strCmp((p) => p.expiry),
+      days: (a, b) => {
+        // الافتراضي: الأقدم/المنتهي أولاً (يطابق السلوك الافتراضي السابق)
         const orderDiff = LEVEL_ORDER[a.status.level] - LEVEL_ORDER[b.status.level];
         if (orderDiff !== 0) return orderDiff;
         return (a.status.days ?? 9e9) - (b.status.days ?? 9e9);
-      });
-  }, [products, search, levelFilter, thresholdDays]);
+      },
+      value: (a, b) => {
+        const av = (bestSupplierPrice(a)?.priceUsd ?? 0) * (a.quantity || 0);
+        const bv = (bestSupplierPrice(b)?.priceUsd ?? 0) * (b.quantity || 0);
+        return av - bv;
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [suppliers],
+  );
+
+  const { sorted: rows, sortProps } = useSortable(filtered, comparators, {
+    key: 'days',
+    dir: 'asc',
+  });
 
   const stats = useMemo(() => {
     const expired = products.filter(
@@ -145,12 +176,12 @@ export default function Expiry() {
         <Table>
           <thead>
             <tr>
-              <Th>الصنف</Th>
-              <Th>المورد الأرخص</Th>
-              <Th align="center">الكمية</Th>
-              <Th align="center">الصلاحية</Th>
-              <Th align="center">الأيام المتبقية</Th>
-              <Th align="end">قيمة المخزون</Th>
+              <Th {...sortProps('name')}>الصنف</Th>
+              <Th {...sortProps('supplier')}>المورد الأرخص</Th>
+              <Th align="center" {...sortProps('quantity')}>الكمية</Th>
+              <Th align="center" {...sortProps('expiry')}>الصلاحية</Th>
+              <Th align="center" {...sortProps('days')}>الأيام المتبقية</Th>
+              <Th align="end" {...sortProps('value')}>قيمة المخزون</Th>
             </tr>
           </thead>
           <tbody>

@@ -18,6 +18,7 @@ import {
 import { useData } from '../store/DataContext';
 import { genId } from '../utils/calc';
 import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
 import type { Supplier, SupplierDebt } from '../types';
 
 const emptyDebt: SupplierDebt = {
@@ -41,13 +42,30 @@ export default function Debts() {
 
   const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name || '—';
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     let list = [...supplierDebts];
     if (filter === 'paid') list = list.filter((d) => d.paid);
     else if (filter === 'unpaid') list = list.filter((d) => !d.paid);
     if (supplierFilter) list = list.filter((d) => d.supplierId === supplierFilter);
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return list;
   }, [supplierDebts, filter, supplierFilter]);
+
+  const comparators = useMemo<Comparators<SupplierDebt>>(
+    () => ({
+      supplier: (a, b) => supplierName(a.supplierId).localeCompare(supplierName(b.supplierId), 'ar'),
+      note: strCmp((d) => d.note),
+      date: strCmp((d) => d.date),
+      amount: (a, b) => (a.amountUsd || 0) - (b.amountUsd || 0),
+      status: (a, b) => Number(a.paid) - Number(b.paid),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [suppliers],
+  );
+
+  const { sorted: rows, sortProps } = useSortable(filtered, comparators, {
+    key: 'date',
+    dir: 'desc',
+  });
 
   const totals = useMemo(() => {
     const unpaid = supplierDebts
@@ -136,11 +154,11 @@ export default function Debts() {
         <Table>
           <thead>
             <tr>
-              <Th>المورد</Th>
-              <Th>الملاحظة</Th>
-              <Th>التاريخ</Th>
-              <Th align="end">المبلغ</Th>
-              <Th align="center">الحالة</Th>
+              <Th {...sortProps('supplier')}>المورد</Th>
+              <Th {...sortProps('note')}>الملاحظة</Th>
+              <Th {...sortProps('date')}>التاريخ</Th>
+              <Th align="end" {...sortProps('amount')}>المبلغ</Th>
+              <Th align="center" {...sortProps('status')}>الحالة</Th>
               <Th align="center">الإجراءات</Th>
             </tr>
           </thead>

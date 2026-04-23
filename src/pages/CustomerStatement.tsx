@@ -17,7 +17,8 @@ import {
 import { useData } from '../store/DataContext';
 import { customerBalanceUsd, genId, invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
 import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
-import type { CustomerPayment } from '../types';
+import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import type { CustomerPayment, Invoice } from '../types';
 
 export default function CustomerStatement() {
   const { id } = useParams<{ id: string }>();
@@ -28,18 +29,44 @@ export default function CustomerStatement() {
   const customer = customers.find((c) => c.id === id);
 
   const custInvoices = useMemo(
-    () =>
-      invoices
-        .filter((i) => i.customerId === id)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    () => invoices.filter((i) => i.customerId === id),
     [invoices, id],
   );
   const custPayments = useMemo(
-    () =>
-      customerPayments
-        .filter((p) => p.customerId === id)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    () => customerPayments.filter((p) => p.customerId === id),
     [customerPayments, id],
+  );
+
+  const invoiceComparators = useMemo<Comparators<Invoice>>(
+    () => ({
+      number: strCmp((i) => i.number),
+      date: strCmp((i) => i.date),
+      items: (a, b) => (a.items?.length || 0) - (b.items?.length || 0),
+      total: (a, b) => invoiceTotalUsd(a) - invoiceTotalUsd(b),
+      remaining: (a, b) => invoiceRemainingUsd(a) - invoiceRemainingUsd(b),
+      paymentType: strCmp((i) => i.paymentType),
+    }),
+    [],
+  );
+
+  const paymentComparators = useMemo<Comparators<CustomerPayment>>(
+    () => ({
+      date: strCmp((p) => p.date),
+      note: strCmp((p) => p.note),
+      amount: (a, b) => (a.amountUsd || 0) - (b.amountUsd || 0),
+    }),
+    [],
+  );
+
+  const { sorted: sortedInvoices, sortProps: invoiceSortProps } = useSortable(
+    custInvoices,
+    invoiceComparators,
+    { key: 'date', dir: 'desc' },
+  );
+  const { sorted: sortedPayments, sortProps: paymentSortProps } = useSortable(
+    custPayments,
+    paymentComparators,
+    { key: 'date', dir: 'desc' },
   );
   const balance = customer && id ? customerBalanceUsd(id, invoices, customerPayments) : 0;
 
@@ -146,23 +173,23 @@ export default function CustomerStatement() {
         <h3 className="text-base font-bold mb-4 flex items-center gap-2">
           <Icon name="receipt_long" /> الفواتير
         </h3>
-        {custInvoices.length === 0 ? (
+        {sortedInvoices.length === 0 ? (
           <EmptyState icon="receipt_long" title="لا توجد فواتير بعد" />
         ) : (
           <Table>
             <thead>
               <tr>
-                <Th>الرقم</Th>
-                <Th>التاريخ</Th>
-                <Th>عدد الأصناف</Th>
-                <Th align="end">الإجمالي</Th>
-                <Th align="end">المتبقي</Th>
-                <Th align="center">النوع</Th>
+                <Th {...invoiceSortProps('number')}>الرقم</Th>
+                <Th {...invoiceSortProps('date')}>التاريخ</Th>
+                <Th {...invoiceSortProps('items')}>عدد الأصناف</Th>
+                <Th align="end" {...invoiceSortProps('total')}>الإجمالي</Th>
+                <Th align="end" {...invoiceSortProps('remaining')}>المتبقي</Th>
+                <Th align="center" {...invoiceSortProps('paymentType')}>النوع</Th>
                 <Th align="center">عرض</Th>
               </tr>
             </thead>
             <tbody>
-              {custInvoices.map((inv) => {
+              {sortedInvoices.map((inv) => {
                 const total = invoiceTotalUsd(inv);
                 const remaining = invoiceRemainingUsd(inv);
                 return (
@@ -216,7 +243,7 @@ export default function CustomerStatement() {
         )}
       </Card>
 
-      {custPayments.length > 0 ? (
+      {sortedPayments.length > 0 ? (
         <Card>
           <h3 className="text-base font-bold mb-4 flex items-center gap-2">
             <Icon name="payments" /> الدفعات اللاحقة
@@ -224,14 +251,14 @@ export default function CustomerStatement() {
           <Table>
             <thead>
               <tr>
-                <Th>التاريخ</Th>
-                <Th>الملاحظة</Th>
-                <Th align="end">المبلغ</Th>
+                <Th {...paymentSortProps('date')}>التاريخ</Th>
+                <Th {...paymentSortProps('note')}>الملاحظة</Th>
+                <Th align="end" {...paymentSortProps('amount')}>المبلغ</Th>
                 <Th align="center">إجراء</Th>
               </tr>
             </thead>
             <tbody>
-              {custPayments.map((p) => (
+              {sortedPayments.map((p) => (
                 <tr key={p.id}>
                   <Td>{fmtDate(p.date)}</Td>
                   <Td>
