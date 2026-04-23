@@ -2,30 +2,27 @@ import { useMemo, useState } from 'react';
 import {
   Button,
   Card,
-  Chip,
   ConfirmDialog,
   EmptyState,
   Icon,
   IconButton,
   Modal,
   SectionHeader,
-  Table,
-  Td,
   TextField,
-  Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { genId, supplierDebtTotalUsd } from '../utils/calc.js';
-import { fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { genId, supplierDebtTotalUsd } from '../utils/calc';
+import { fmtSyp, fmtUsd } from '../utils/format';
+import type { Supplier } from '../types';
 
-const emptySupplier = { id: '', name: '', phone: '', address: '', notes: '' };
+const emptySupplier: Supplier = { id: '', name: '', phone: '', address: '', notes: '' };
 
 export default function Suppliers() {
   const { db, addItem, updateItem, removeItem } = useData();
   const { suppliers, products, supplierDebts, settings } = db;
   const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [editing, setEditing] = useState<Supplier | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Supplier | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -38,7 +35,7 @@ export default function Suppliers() {
     );
   }, [suppliers, search]);
 
-  const save = (sup) => {
+  const save = (sup: Supplier) => {
     if (sup.id && suppliers.some((s) => s.id === sup.id)) {
       updateItem('suppliers', sup.id, sup);
     } else {
@@ -91,9 +88,7 @@ export default function Suppliers() {
                       {sup.name}
                     </h3>
                     {sup.notes ? (
-                      <p className="text-xs text-[var(--color-on-surface-variant)] mt-0.5">
-                        {sup.notes}
-                      </p>
+                      <p className="text-xs text-[var(--color-on-surface-variant)] mt-0.5">{sup.notes}</p>
                     ) : null}
                   </div>
                   <div className="flex -me-1">
@@ -156,7 +151,7 @@ export default function Suppliers() {
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={() => removeItem('suppliers', confirmDelete.id)}
+        onConfirm={() => confirmDelete && removeItem('suppliers', confirmDelete.id)}
         title="حذف مورد"
         message={`هل تريد حذف "${confirmDelete?.name}"؟ هذا قد يؤثر على الأصناف التي تربطه بأسعار.`}
         confirmLabel="حذف"
@@ -166,10 +161,16 @@ export default function Suppliers() {
   );
 }
 
-function SupplierEditor({ supplier, onClose, onSave }) {
-  const [form, setForm] = useState(supplier);
-  const patch = (p) => setForm((f) => ({ ...f, ...p }));
-  const valid = form.name.trim();
+interface SupplierEditorProps {
+  supplier: Supplier;
+  onClose: () => void;
+  onSave: (s: Supplier) => void;
+}
+
+function SupplierEditor({ supplier, onClose, onSave }: SupplierEditorProps) {
+  const [form, setForm] = useState<Supplier>(supplier);
+  const patch = (p: Partial<Supplier>) => setForm((f) => ({ ...f, ...p }));
+  const valid = Boolean(form.name.trim());
 
   return (
     <Modal

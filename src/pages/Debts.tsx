@@ -5,7 +5,6 @@ import {
   Chip,
   ConfirmDialog,
   EmptyState,
-  Icon,
   IconButton,
   Modal,
   SectionHeader,
@@ -15,38 +14,52 @@ import {
   Td,
   TextField,
   Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { genId } from '../utils/calc.js';
-import { fmtDate, fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { genId } from '../utils/calc';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import type { Supplier, SupplierDebt } from '../types';
 
-const emptyDebt = { id: '', supplierId: '', amountUsd: 0, date: new Date().toISOString().slice(0, 10), note: '', paid: false };
+const emptyDebt: SupplierDebt = {
+  id: '',
+  supplierId: '',
+  amountUsd: 0,
+  date: new Date().toISOString().slice(0, 10),
+  note: '',
+  paid: false,
+};
+
+type FilterState = 'all' | 'paid' | 'unpaid';
 
 export default function Debts() {
   const { db, addItem, updateItem, removeItem } = useData();
   const { supplierDebts, suppliers, settings } = db;
-  const [filter, setFilter] = useState('unpaid'); // all | paid | unpaid
+  const [filter, setFilter] = useState<FilterState>('unpaid');
   const [supplierFilter, setSupplierFilter] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [editing, setEditing] = useState<SupplierDebt | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SupplierDebt | null>(null);
 
-  const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
+  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name || '—';
 
   const rows = useMemo(() => {
     let list = [...supplierDebts];
     if (filter === 'paid') list = list.filter((d) => d.paid);
     else if (filter === 'unpaid') list = list.filter((d) => !d.paid);
     if (supplierFilter) list = list.filter((d) => d.supplierId === supplierFilter);
-    return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [supplierDebts, filter, supplierFilter]);
 
   const totals = useMemo(() => {
-    const unpaid = supplierDebts.filter((d) => !d.paid).reduce((s, d) => s + (d.amountUsd || 0), 0);
-    const paid = supplierDebts.filter((d) => d.paid).reduce((s, d) => s + (d.amountUsd || 0), 0);
+    const unpaid = supplierDebts
+      .filter((d) => !d.paid)
+      .reduce((s, d) => s + (d.amountUsd || 0), 0);
+    const paid = supplierDebts
+      .filter((d) => d.paid)
+      .reduce((s, d) => s + (d.amountUsd || 0), 0);
     return { unpaid, paid };
   }, [supplierDebts]);
 
-  const save = (debt) => {
+  const save = (debt: SupplierDebt) => {
     if (debt.id && supplierDebts.some((d) => d.id === debt.id)) {
       updateItem('supplierDebts', debt.id, debt);
     } else {
@@ -97,7 +110,7 @@ export default function Debts() {
             label="الحالة"
             icon="filter_list"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value as FilterState)}
             options={[
               { value: 'unpaid', label: 'غير مسددة فقط' },
               { value: 'paid', label: 'مسددة فقط' },
@@ -200,7 +213,7 @@ export default function Debts() {
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={() => removeItem('supplierDebts', confirmDelete.id)}
+        onConfirm={() => confirmDelete && removeItem('supplierDebts', confirmDelete.id)}
         title="حذف السجل"
         message="هل تريد حذف هذا السجل؟"
         confirmLabel="حذف"
@@ -210,10 +223,18 @@ export default function Debts() {
   );
 }
 
-function DebtEditor({ debt, suppliers, exchangeRate, onClose, onSave }) {
-  const [form, setForm] = useState(debt);
-  const patch = (p) => setForm((f) => ({ ...f, ...p }));
-  const valid = form.supplierId && form.amountUsd > 0;
+interface DebtEditorProps {
+  debt: SupplierDebt;
+  suppliers: Supplier[];
+  exchangeRate: number;
+  onClose: () => void;
+  onSave: (d: SupplierDebt) => void;
+}
+
+function DebtEditor({ debt, suppliers, exchangeRate, onClose, onSave }: DebtEditorProps) {
+  const [form, setForm] = useState<SupplierDebt>(debt);
+  const patch = (p: Partial<SupplierDebt>) => setForm((f) => ({ ...f, ...p }));
+  const valid = Boolean(form.supplierId && form.amountUsd > 0);
 
   return (
     <Modal
@@ -248,7 +269,7 @@ function DebtEditor({ debt, suppliers, exchangeRate, onClose, onSave }) {
           step="0.01"
           icon="payments"
           value={form.amountUsd}
-          onChange={(e) => patch({ amountUsd: +e.target.value || 0 })}
+          onChange={(e) => patch({ amountUsd: Number(e.target.value) || 0 })}
           suffix={`≈ ${fmtSyp((form.amountUsd || 0) * exchangeRate)}`}
         />
         <TextField

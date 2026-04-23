@@ -1,12 +1,19 @@
 import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { Button, Card, Chip, EmptyState, Icon, IconButton, SectionHeader } from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc.js';
-import { fmtDate, fmtSyp, fmtUsd } from '../utils/format.js';
+import {
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Icon,
+  SectionHeader,
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
 
 export default function InvoiceView() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { db } = useData();
   const { invoices, customers, settings } = db;
   const [params] = useSearchParams();
@@ -19,6 +26,7 @@ export default function InvoiceView() {
       const t = setTimeout(() => window.print(), 300);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [invoice, params]);
 
   if (!invoice) {
@@ -66,7 +74,6 @@ export default function InvoiceView() {
       </div>
 
       <Card className="max-w-4xl mx-auto !p-8 print:shadow-none print:border print:border-gray-300">
-        {/* رأس الفاتورة */}
         <div className="flex items-start justify-between gap-4 border-b-2 border-[var(--color-outline-variant)] pb-5">
           <div>
             <div className="flex items-center gap-3">
@@ -108,7 +115,6 @@ export default function InvoiceView() {
           </div>
         </div>
 
-        {/* العميل */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div className="p-4 rounded-2xl bg-[var(--color-surface-dim)]">
             <div className="text-xs text-[var(--color-on-surface-variant)] mb-1">إلى العميل</div>
@@ -140,7 +146,9 @@ export default function InvoiceView() {
                   متبقي {fmtUsd(remaining)}
                 </span>
               ) : (
-                <span className="text-sm text-[var(--color-success)] font-semibold">مسدّدة بالكامل</span>
+                <span className="text-sm text-[var(--color-success)] font-semibold">
+                  مسدّدة بالكامل
+                </span>
               )}
             </div>
             {invoice.notes ? (
@@ -151,7 +159,6 @@ export default function InvoiceView() {
           </div>
         </div>
 
-        {/* الأصناف */}
         <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--color-outline-variant)]">
           <table className="w-full text-sm">
             <thead>
@@ -190,7 +197,6 @@ export default function InvoiceView() {
           </table>
         </div>
 
-        {/* الإجمالي */}
         <div className="mt-5 flex justify-end">
           <div className="w-full md:w-80 space-y-2">
             <div className="flex items-center justify-between text-sm">
@@ -218,7 +224,6 @@ export default function InvoiceView() {
           </div>
         </div>
 
-        {/* التوقيع */}
         <div className="mt-8 pt-6 border-t border-[var(--color-outline-variant)] grid grid-cols-2 gap-6 text-sm">
           <div>
             <div className="text-xs text-[var(--color-on-surface-variant)] mb-4">توقيع الصيدلية المستلمة</div>

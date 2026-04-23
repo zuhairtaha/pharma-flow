@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ChangeEvent, useState } from 'react';
 import {
   Button,
   Card,
@@ -6,19 +6,20 @@ import {
   Icon,
   SectionHeader,
   TextField,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { fmtSyp } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { fmtSyp } from '../utils/format';
+import type { Settings as SettingsType } from '../types';
 
 export default function Settings() {
   const { db, updateSettings, resetData, exportJson, setDb } = useData();
   const { settings } = db;
-  const [form, setForm] = useState(settings);
+  const [form, setForm] = useState<SettingsType>(settings);
   const [saved, setSaved] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [importError, setImportError] = useState('');
 
-  const patch = (p) => {
+  const patch = (p: Partial<SettingsType>) => {
     setForm((f) => ({ ...f, ...p }));
     setSaved(false);
   };
@@ -39,13 +40,15 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
-  const importJson = (e) => {
+  const importJson = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
+        const text = ev.target?.result;
+        if (typeof text !== 'string') throw new Error('ملف غير صالح');
+        const data = JSON.parse(text);
         if (!data.settings || !Array.isArray(data.products)) {
           throw new Error('صيغة الملف غير متوافقة');
         }
@@ -53,7 +56,7 @@ export default function Settings() {
         setForm(data.settings);
         setImportError('');
       } catch (err) {
-        setImportError(err.message || 'تعذّر قراءة الملف');
+        setImportError(err instanceof Error ? err.message : 'تعذّر قراءة الملف');
       }
     };
     reader.readAsText(file);
@@ -64,7 +67,7 @@ export default function Settings() {
       <SectionHeader
         icon="settings"
         title="الإعدادات"
-        subtitle="معلومات الصيدلية، سعر الصرف، وإدارة البيانات"
+        subtitle="معلومات الشركة، سعر الصرف، وإدارة البيانات"
       />
 
       <Card>
@@ -109,7 +112,7 @@ export default function Settings() {
             icon="currency_exchange"
             type="number"
             value={form.exchangeRate}
-            onChange={(e) => patch({ exchangeRate: +e.target.value || 0 })}
+            onChange={(e) => patch({ exchangeRate: Number(e.target.value) || 0 })}
             suffix="ل.س / 1$"
             hint={`حالياً: 1$ = ${fmtSyp(form.exchangeRate)}`}
           />
@@ -118,7 +121,7 @@ export default function Settings() {
             icon="warning"
             type="number"
             value={form.lowStockThreshold}
-            onChange={(e) => patch({ lowStockThreshold: +e.target.value || 0 })}
+            onChange={(e) => patch({ lowStockThreshold: Number(e.target.value) || 0 })}
             suffix="وحدة"
           />
           <TextField
@@ -126,7 +129,7 @@ export default function Settings() {
             icon="trending_up"
             type="number"
             value={form.defaultProfitDist}
-            onChange={(e) => patch({ defaultProfitDist: +e.target.value || 0 })}
+            onChange={(e) => patch({ defaultProfitDist: Number(e.target.value) || 0 })}
             suffix="%"
             hint="يُطبَّق عادةً على الموزعين الثانويين والعملاء الكبار"
           />
@@ -135,7 +138,7 @@ export default function Settings() {
             icon="storefront"
             type="number"
             value={form.defaultProfitPharmacy}
-            onChange={(e) => patch({ defaultProfitPharmacy: +e.target.value || 0 })}
+            onChange={(e) => patch({ defaultProfitPharmacy: Number(e.target.value) || 0 })}
             suffix="%"
             hint="يُطبَّق عند البيع المباشر للصيدليات"
           />
@@ -144,7 +147,7 @@ export default function Settings() {
             icon="schedule"
             type="number"
             value={form.nearExpiryDays}
-            onChange={(e) => patch({ nearExpiryDays: +e.target.value || 0 })}
+            onChange={(e) => patch({ nearExpiryDays: Number(e.target.value) || 0 })}
             suffix="يوم"
             className="md:col-span-2"
           />

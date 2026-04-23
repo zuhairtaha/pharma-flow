@@ -3,60 +3,74 @@ import { useNavigate, useSearchParams } from 'react-router';
 import {
   Button,
   Card,
-  Chip,
   EmptyState,
   Icon,
   IconButton,
   SectionHeader,
   Select,
   TextField,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import {
-  bestSupplierPrice,
-  genId,
-  genInvoiceNumber,
-  sellPriceUsd,
-} from '../utils/calc.js';
-import { fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { bestSupplierPrice, genId, genInvoiceNumber, sellPriceUsd } from '../utils/calc';
+import { fmtSyp, fmtUsd } from '../utils/format';
+import type { Invoice, PaymentType, Product } from '../types';
+
+interface DraftItem {
+  productId: string;
+  name: string;
+  unit: string;
+  maxQty: number;
+  quantity: number;
+  priceUsd: number;
+}
+
+interface QuickCustomerDraft {
+  name: string;
+  owner: string;
+  phone: string;
+  address: string;
+}
 
 export default function NewInvoice() {
   const { db, addItem, updateItem } = useData();
   const { products, customers, invoices, settings } = db;
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const preselectedCustomer = params.get('customer') || '';
+  const preselectedCustomer = params.get('customer') ?? '';
 
   const [customerId, setCustomerId] = useState(preselectedCustomer);
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
-  const [quickCustomer, setQuickCustomer] = useState({ name: '', owner: '', phone: '', address: '' });
-  const [items, setItems] = useState([]);
+  const [quickCustomer, setQuickCustomer] = useState<QuickCustomerDraft>({
+    name: '',
+    owner: '',
+    phone: '',
+    address: '',
+  });
+  const [items, setItems] = useState<DraftItem[]>([]);
   const [search, setSearch] = useState('');
-  const [paymentType, setPaymentType] = useState('cash');
+  const [paymentType, setPaymentType] = useState<PaymentType>('cash');
   const [paidUsd, setPaidUsd] = useState(0);
   const [notes, setNotes] = useState('');
-  const [exchangeRate, setExchangeRate] = useState(settings.exchangeRate);
+  const [exchangeRate, setExchangeRate] = useState<number>(settings.exchangeRate);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
-  const searchResults = useMemo(() => {
+  const searchResults = useMemo<Product[]>(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
     return products
-      .filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.barcode?.includes(q),
-      )
+      .filter((p) => p.name.toLowerCase().includes(q) || p.barcode?.includes(q))
       .slice(0, 8);
   }, [products, search]);
 
-  const addItemToInvoice = (p) => {
+  const addItemToInvoice = (p: Product) => {
     if (!p || (p.quantity || 0) <= 0) return;
     const existing = items.find((it) => it.productId === p.id);
     if (existing) {
       setItems((list) =>
         list.map((it) =>
-          it.productId === p.id ? { ...it, quantity: Math.min((p.quantity || 0), it.quantity + 1) } : it,
+          it.productId === p.id
+            ? { ...it, quantity: Math.min(p.quantity || 0, it.quantity + 1) }
+            : it,
         ),
       );
     } else {
@@ -77,19 +91,21 @@ export default function NewInvoice() {
     setSearch('');
   };
 
-  const updateItemField = (i, patch) => {
-    setItems((list) =>
-      list.map((it, idx) => (idx === i ? { ...it, ...patch } : it)),
-    );
+  const updateItemField = (i: number, patch: Partial<DraftItem>) => {
+    setItems((list) => list.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   };
-  const removeItemFromInvoice = (i) => setItems((list) => list.filter((_, idx) => idx !== i));
+  const removeItemFromInvoice = (i: number) =>
+    setItems((list) => list.filter((_, idx) => idx !== i));
 
   const totalUsd = items.reduce((s, it) => s + it.priceUsd * it.quantity, 0);
   const totalSyp = totalUsd * exchangeRate;
   const paidSyp = paidUsd * exchangeRate;
   const remainingUsd = Math.max(0, totalUsd - paidUsd);
 
-  const canSave = customerId && items.length > 0 && items.every((it) => it.quantity > 0 && it.priceUsd >= 0);
+  const canSave =
+    Boolean(customerId) &&
+    items.length > 0 &&
+    items.every((it) => it.quantity > 0 && it.priceUsd >= 0);
 
   const saveQuickCustomer = () => {
     if (!quickCustomer.name.trim()) return;
@@ -101,7 +117,7 @@ export default function NewInvoice() {
   };
 
   const saveInvoice = (andPrint = false) => {
-    const inv = {
+    const inv: Invoice = {
       id: genId('inv'),
       number: genInvoiceNumber(invoices),
       customerId,
@@ -124,11 +140,7 @@ export default function NewInvoice() {
         quantity: Math.max(0, (p.quantity || 0) - it.quantity),
       }));
     });
-    if (andPrint) {
-      navigate(`/invoices/${inv.id}?print=1`);
-    } else {
-      navigate(`/invoices/${inv.id}`);
-    }
+    navigate(`/invoices/${inv.id}${andPrint ? '?print=1' : ''}`);
   };
 
   return (
@@ -153,7 +165,8 @@ export default function NewInvoice() {
               placeholder="اختر الصيدلية"
               options={customers.map((c) => ({
                 value: c.id,
-                label: c.name + (c.owner ? ` — ${c.owner}` : '') + (c.phone ? ` · ${c.phone}` : ''),
+                label:
+                  c.name + (c.owner ? ` — ${c.owner}` : '') + (c.phone ? ` · ${c.phone}` : ''),
               }))}
               className="flex-1"
             />
@@ -298,7 +311,9 @@ export default function NewInvoice() {
                             <button
                               type="button"
                               className="md-state h-8 w-8 rounded-full bg-[var(--color-surface-dim)]"
-                              onClick={() => updateItemField(i, { quantity: Math.max(1, it.quantity - 1) })}
+                              onClick={() =>
+                                updateItemField(i, { quantity: Math.max(1, it.quantity - 1) })
+                              }
                             >
                               <Icon name="remove" />
                             </button>
@@ -306,7 +321,12 @@ export default function NewInvoice() {
                               type="number"
                               value={it.quantity}
                               onChange={(e) =>
-                                updateItemField(i, { quantity: Math.max(1, Math.min(it.maxQty, +e.target.value || 1)) })
+                                updateItemField(i, {
+                                  quantity: Math.max(
+                                    1,
+                                    Math.min(it.maxQty, Number(e.target.value) || 1),
+                                  ),
+                                })
                               }
                               className="w-16 h-8 rounded-lg border border-[var(--color-outline-variant)] text-center tabular-nums bg-transparent"
                             />
@@ -314,7 +334,9 @@ export default function NewInvoice() {
                               type="button"
                               className="md-state h-8 w-8 rounded-full bg-[var(--color-surface-dim)]"
                               onClick={() =>
-                                updateItemField(i, { quantity: Math.min(it.maxQty, it.quantity + 1) })
+                                updateItemField(i, {
+                                  quantity: Math.min(it.maxQty, it.quantity + 1),
+                                })
                               }
                             >
                               <Icon name="add" />
@@ -326,7 +348,9 @@ export default function NewInvoice() {
                             type="number"
                             step="0.01"
                             value={it.priceUsd}
-                            onChange={(e) => updateItemField(i, { priceUsd: +e.target.value || 0 })}
+                            onChange={(e) =>
+                              updateItemField(i, { priceUsd: Number(e.target.value) || 0 })
+                            }
                             className="w-24 h-8 rounded-lg border border-[var(--color-outline-variant)] text-end px-2 tabular-nums bg-transparent"
                           />
                           <div className="text-[11px] text-[var(--color-on-surface-variant)] tabular-nums mt-0.5">
@@ -340,7 +364,12 @@ export default function NewInvoice() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <IconButton name="close" label="حذف" size="sm" onClick={() => removeItemFromInvoice(i)} />
+                          <IconButton
+                            name="close"
+                            label="حذف"
+                            size="sm"
+                            onClick={() => removeItemFromInvoice(i)}
+                          />
                         </td>
                       </tr>
                     );
@@ -361,7 +390,7 @@ export default function NewInvoice() {
             label="طريقة الدفع"
             icon="payments"
             value={paymentType}
-            onChange={(e) => setPaymentType(e.target.value)}
+            onChange={(e) => setPaymentType(e.target.value as PaymentType)}
             options={[
               { value: 'cash', label: 'نقدي (تسديد كامل)' },
               { value: 'credit', label: 'مدين (تسديد جزئي/آجل)' },
@@ -372,7 +401,7 @@ export default function NewInvoice() {
             icon="currency_exchange"
             type="number"
             value={exchangeRate}
-            onChange={(e) => setExchangeRate(+e.target.value || 0)}
+            onChange={(e) => setExchangeRate(Number(e.target.value) || 0)}
             suffix="ل.س / $"
           />
           {paymentType === 'credit' ? (
@@ -382,7 +411,9 @@ export default function NewInvoice() {
               type="number"
               step="0.01"
               value={paidUsd}
-              onChange={(e) => setPaidUsd(Math.min(totalUsd, Math.max(0, +e.target.value || 0)))}
+              onChange={(e) =>
+                setPaidUsd(Math.min(totalUsd, Math.max(0, Number(e.target.value) || 0)))
+              }
               suffix={`≈ ${fmtSyp(paidSyp)}`}
             />
           ) : (
@@ -438,12 +469,7 @@ export default function NewInvoice() {
           <Button variant="text" onClick={() => navigate('/invoices')}>
             إلغاء
           </Button>
-          <Button
-            variant="tonal"
-            icon="save"
-            disabled={!canSave}
-            onClick={() => saveInvoice(false)}
-          >
+          <Button variant="tonal" icon="save" disabled={!canSave} onClick={() => saveInvoice(false)}>
             حفظ الفاتورة
           </Button>
           <Button icon="print" disabled={!canSave} onClick={() => saveInvoice(true)}>

@@ -14,20 +14,21 @@ import {
   Td,
   TextField,
   Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc.js';
-import { fmtDate, fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import type { Customer, Invoice, PaymentType } from '../types';
 
 export default function Invoices() {
   const { db, removeItem } = useData();
   const { invoices, customers, settings } = db;
   const [search, setSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<'' | PaymentType>('');
   const [customerFilter, setCustomerFilter] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null);
 
-  const customerById = (id) => customers.find((c) => c.id === id);
+  const customerById = (id: string): Customer | undefined => customers.find((c) => c.id === id);
 
   const filtered = useMemo(() => {
     let list = [...invoices];
@@ -44,7 +45,8 @@ export default function Invoices() {
     }
     if (paymentFilter) list = list.filter((i) => i.paymentType === paymentFilter);
     if (customerFilter) list = list.filter((i) => i.customerId === customerFilter);
-    return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, search, paymentFilter, customerFilter, customers]);
 
   const totals = useMemo(() => {
@@ -69,12 +71,7 @@ export default function Invoices() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          icon="receipt_long"
-          label="عدد الفواتير"
-          value={totals.count}
-          tone="primary"
-        />
+        <StatCard icon="receipt_long" label="عدد الفواتير" value={totals.count} tone="primary" />
         <StatCard
           icon="point_of_sale"
           label="إجمالي المبيعات"
@@ -103,7 +100,7 @@ export default function Invoices() {
             placeholder="كل طرق الدفع"
             icon="payments"
             value={paymentFilter}
-            onChange={(e) => setPaymentFilter(e.target.value)}
+            onChange={(e) => setPaymentFilter(e.target.value as '' | PaymentType)}
             options={[
               { value: 'cash', label: 'نقدي' },
               { value: 'credit', label: 'مدين (آجل)' },
@@ -229,7 +226,7 @@ export default function Invoices() {
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={() => removeItem('invoices', confirmDelete.id)}
+        onConfirm={() => confirmDelete && removeItem('invoices', confirmDelete.id)}
         title="حذف فاتورة"
         message={`هل تريد حذف "${confirmDelete?.number}"؟ لن يتم استرجاع المخزون.`}
         confirmLabel="حذف"

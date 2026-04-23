@@ -14,25 +14,21 @@ import {
   Td,
   TextField,
   Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
 import {
   bestSupplierPrice,
   genId,
   sellPriceSyp,
   sellPriceUsd,
   worstSupplierPrice,
-} from '../utils/calc.js';
-import {
-  expiryStatus,
-  fmtDate,
-  fmtInt,
-  fmtNum,
-  fmtSyp,
-  fmtUsd,
-} from '../utils/format.js';
+} from '../utils/calc';
+import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
+import type { Product, Settings, Supplier, SupplierPrice } from '../types';
 
-const emptyProduct = {
+type ProductDraft = Omit<Product, 'id'> & { id: string };
+
+const emptyProduct: ProductDraft = {
   id: '',
   name: '',
   barcode: '',
@@ -53,13 +49,16 @@ export default function Inventory() {
   const [filterSource, setFilterSource] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [showBestPrice, setShowBestPrice] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [editing, setEditing] = useState<ProductDraft | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
 
-  const sources = useMemo(() => Array.from(new Set(products.map((p) => p.source))).filter(Boolean), [products]);
+  const sources = useMemo(
+    () => Array.from(new Set(products.map((p) => p.source))).filter(Boolean),
+    [products],
+  );
 
   const filtered = useMemo(() => {
-    let list = products;
+    let list: Product[] = products;
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -70,9 +69,9 @@ export default function Inventory() {
       );
     }
     if (filterSource) list = list.filter((p) => p.source === filterSource);
-    if (filterSupplier) list = list.filter((p) => p.prices?.some((pp) => pp.supplierId === filterSupplier));
+    if (filterSupplier)
+      list = list.filter((p) => p.prices?.some((pp) => pp.supplierId === filterSupplier));
     if (showBestPrice) {
-      // رتّب تصاعدياً على أفضل سعر (الأرخص أولاً)
       list = [...list].sort((a, b) => {
         const ab = bestSupplierPrice(a)?.priceUsd ?? Infinity;
         const bb = bestSupplierPrice(b)?.priceUsd ?? Infinity;
@@ -82,7 +81,7 @@ export default function Inventory() {
     return list;
   }, [products, search, filterSource, filterSupplier, showBestPrice]);
 
-  const onSave = (prod) => {
+  const onSave = (prod: ProductDraft) => {
     if (prod.id && products.some((p) => p.id === prod.id)) {
       updateItem('products', prod.id, prod);
     } else {
@@ -91,7 +90,7 @@ export default function Inventory() {
     setEditing(null);
   };
 
-  const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
+  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name || '—';
 
   return (
     <div className="space-y-6">
@@ -168,7 +167,9 @@ export default function Inventory() {
               const best = bestSupplierPrice(p);
               const worst = worstSupplierPrice(p);
               const retailUsd = best ? sellPriceUsd(best.priceUsd, p.profitPharmacy) : 0;
-              const retailSyp = best ? sellPriceSyp(best.priceUsd, p.profitPharmacy, settings.exchangeRate) : 0;
+              const retailSyp = best
+                ? sellPriceSyp(best.priceUsd, p.profitPharmacy, settings.exchangeRate)
+                : 0;
               const wholesaleUsd = best ? sellPriceUsd(best.priceUsd, p.profitDist) : 0;
               const wholesaleSyp = best
                 ? sellPriceSyp(best.priceUsd, p.profitDist, settings.exchangeRate)
@@ -197,11 +198,17 @@ export default function Inventory() {
                   </Td>
                   <Td align="center">
                     <div className="inline-flex items-center gap-1">
-                      <span className={`font-semibold tabular-nums ${lowStock ? 'text-[var(--color-error)]' : ''}`}>
+                      <span
+                        className={`font-semibold tabular-nums ${
+                          lowStock ? 'text-[var(--color-error)]' : ''
+                        }`}
+                      >
                         {fmtInt(p.quantity)}
                       </span>
                       <span className="text-xs text-[var(--color-on-surface-variant)]">{p.unit}</span>
-                      {lowStock ? <Icon name="warning" className="text-[14px] text-[var(--color-error)]" /> : null}
+                      {lowStock ? (
+                        <Icon name="warning" className="text-[14px] text-[var(--color-error)]" />
+                      ) : null}
                     </div>
                   </Td>
                   <Td align="end">
@@ -284,7 +291,7 @@ export default function Inventory() {
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={() => removeItem('products', confirmDelete.id)}
+        onConfirm={() => confirmDelete && removeItem('products', confirmDelete.id)}
         title="حذف الصنف"
         message={`هل تريد فعلاً حذف "${confirmDelete?.name}"؟ لا يمكن التراجع عن هذا الإجراء.`}
         confirmLabel="حذف"
@@ -294,13 +301,21 @@ export default function Inventory() {
   );
 }
 
-function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
-  const [form, setForm] = useState(() => ({
+interface ProductEditorProps {
+  product: ProductDraft;
+  suppliers: Supplier[];
+  settings: Settings;
+  onClose: () => void;
+  onSave: (p: ProductDraft) => void;
+}
+
+function ProductEditor({ product, suppliers, settings, onClose, onSave }: ProductEditorProps) {
+  const [form, setForm] = useState<ProductDraft>(() => ({
     ...product,
     prices: product.prices?.length ? product.prices : [],
   }));
 
-  const patch = (p) => setForm((f) => ({ ...f, ...p }));
+  const patch = (p: Partial<ProductDraft>) => setForm((f) => ({ ...f, ...p }));
 
   const addPrice = () => {
     const usedIds = new Set(form.prices.map((p) => p.supplierId));
@@ -309,13 +324,13 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
     patch({ prices: [...form.prices, { supplierId: next.id, priceUsd: 0 }] });
   };
 
-  const updatePrice = (i, p) => {
+  const updatePrice = (i: number, p: Partial<SupplierPrice>) => {
     const next = [...form.prices];
     next[i] = { ...next[i], ...p };
     patch({ prices: next });
   };
 
-  const removePrice = (i) => {
+  const removePrice = (i: number) => {
     const next = [...form.prices];
     next.splice(i, 1);
     patch({ prices: next });
@@ -323,13 +338,15 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
 
   const best = bestSupplierPrice(form);
   const retailUsd = best ? sellPriceUsd(best.priceUsd, form.profitPharmacy) : 0;
-  const retailSyp = best ? sellPriceSyp(best.priceUsd, form.profitPharmacy, settings.exchangeRate) : 0;
+  const retailSyp = best
+    ? sellPriceSyp(best.priceUsd, form.profitPharmacy, settings.exchangeRate)
+    : 0;
   const wholesaleUsd = best ? sellPriceUsd(best.priceUsd, form.profitDist) : 0;
   const wholesaleSyp = best
     ? sellPriceSyp(best.priceUsd, form.profitDist, settings.exchangeRate)
     : 0;
 
-  const valid = form.name.trim() && form.expiry && form.prices.length > 0;
+  const valid = Boolean(form.name.trim() && form.expiry && form.prices.length > 0);
 
   return (
     <Modal
@@ -396,7 +413,7 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
           type="number"
           icon="inventory"
           value={form.quantity}
-          onChange={(e) => patch({ quantity: Math.max(0, +e.target.value || 0) })}
+          onChange={(e) => patch({ quantity: Math.max(0, Number(e.target.value) || 0) })}
           suffix={form.unit}
         />
         <TextField
@@ -404,7 +421,7 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
           type="number"
           icon="trending_up"
           value={form.profitDist}
-          onChange={(e) => patch({ profitDist: +e.target.value || 0 })}
+          onChange={(e) => patch({ profitDist: Number(e.target.value) || 0 })}
           suffix="%"
           hint="يُطبَّق على الموزعين الثانويين"
         />
@@ -413,7 +430,7 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
           type="number"
           icon="storefront"
           value={form.profitPharmacy}
-          onChange={(e) => patch({ profitPharmacy: +e.target.value || 0 })}
+          onChange={(e) => patch({ profitPharmacy: Number(e.target.value) || 0 })}
           suffix="%"
           hint="يُطبَّق على الصيدليات المباشرة"
         />
@@ -464,7 +481,7 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }) {
                       type="number"
                       step="0.01"
                       value={p.priceUsd}
-                      onChange={(e) => updatePrice(i, { priceUsd: +e.target.value || 0 })}
+                      onChange={(e) => updatePrice(i, { priceUsd: Number(e.target.value) || 0 })}
                       suffix={`≈ ${fmtSyp(p.priceUsd * settings.exchangeRate)}`}
                     />
                   </div>

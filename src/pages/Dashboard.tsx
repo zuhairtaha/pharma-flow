@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { Card, Chip, Icon, SectionHeader, StatCard, Table, Td, Th } from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
+import { Card, Chip, Icon, SectionHeader, StatCard, Table, Td, Th } from '../components/UI';
+import { useData } from '../store/DataContext';
 import {
   bestSupplierPrice,
   customerBalanceUsd,
@@ -9,15 +9,9 @@ import {
   invoiceRemainingUsd,
   invoiceTotalUsd,
   supplierDebtTotalUsd,
-} from '../utils/calc.js';
-import {
-  expiryStatus,
-  fmtDate,
-  fmtInt,
-  fmtNum,
-  fmtSyp,
-  fmtUsd,
-} from '../utils/format.js';
+} from '../utils/calc';
+import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
+import type { Customer } from '../types';
 
 export default function Dashboard() {
   const { db } = useData();
@@ -26,24 +20,30 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const invValueUsd = inventoryValueUsd(products);
     const totalItems = products.reduce((s, p) => s + (p.quantity || 0), 0);
-    const lowStock = products.filter((p) => (p.quantity || 0) <= (settings.lowStockThreshold || 30)).length;
+    const lowStock = products.filter(
+      (p) => (p.quantity || 0) <= (settings.lowStockThreshold || 30),
+    ).length;
     const nearExpiry = products.filter((p) => {
       const s = expiryStatus(p.expiry, settings.nearExpiryDays).level;
       return s === 'warning' || s === 'critical' || s === 'expired';
     }).length;
-
     const totalSalesUsd = invoices.reduce((s, inv) => s + invoiceTotalUsd(inv), 0);
     const receivablesUsd = customers.reduce(
       (s, c) => s + Math.max(0, customerBalanceUsd(c.id, invoices, customerPayments)),
       0,
     );
-    const payablesUsd = suppliers.reduce((s, sup) => s + supplierDebtTotalUsd(sup.id, supplierDebts), 0);
-
+    const payablesUsd = suppliers.reduce(
+      (s, sup) => s + supplierDebtTotalUsd(sup.id, supplierDebts),
+      0,
+    );
     return { invValueUsd, totalItems, lowStock, nearExpiry, totalSalesUsd, receivablesUsd, payablesUsd };
   }, [products, invoices, customers, suppliers, supplierDebts, customerPayments, settings]);
 
   const latestInvoices = useMemo(
-    () => [...invoices].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5),
+    () =>
+      [...invoices]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5),
     [invoices],
   );
 
@@ -55,7 +55,7 @@ export default function Dashboard() {
       .slice(0, 6);
   }, [products, settings.nearExpiryDays]);
 
-  const customerById = (id) => customers.find((c) => c.id === id);
+  const customerById = (id: string): Customer | undefined => customers.find((c) => c.id === id);
 
   return (
     <div className="space-y-6">
@@ -188,46 +188,39 @@ export default function Dashboard() {
             </div>
           ) : (
             <ul className="space-y-3">
-              {expiringProducts.map((p) => {
-                const best = bestSupplierPrice(p);
-                return (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--color-surface-dim)]"
+              {expiringProducts.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--color-surface-dim)]"
+                >
+                  <div
+                    className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      p.status.level === 'expired' || p.status.level === 'critical'
+                        ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
+                        : 'bg-[var(--color-tertiary-container)] text-[var(--color-on-tertiary-container)]'
+                    }`}
                   >
-                    <div
-                      className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        p.status.level === 'expired'
-                          ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
-                          : p.status.level === 'critical'
-                          ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
-                          : 'bg-[var(--color-tertiary-container)] text-[var(--color-on-tertiary-container)]'
-                      }`}
-                    >
-                      <Icon name="schedule" />
+                    <Icon name="schedule" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold truncate">{p.name}</div>
+                    <div className="text-xs text-[var(--color-on-surface-variant)]">
+                      {fmtDate(p.expiry)} · كمية {fmtInt(p.quantity)}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">{p.name}</div>
-                      <div className="text-xs text-[var(--color-on-surface-variant)]">
-                        {fmtDate(p.expiry)} · كمية {fmtInt(p.quantity)}
-                      </div>
-                    </div>
-                    <Chip
-                      tone={
-                        p.status.level === 'expired'
-                          ? 'error'
-                          : p.status.level === 'critical'
-                          ? 'error'
-                          : 'warning'
-                      }
-                    >
-                      {p.status.level === 'expired'
-                        ? `منتهٍ منذ ${Math.abs(p.status.days)} يوم`
-                        : `${fmtNum(p.status.days)} يوم`}
-                    </Chip>
-                  </li>
-                );
-              })}
+                  </div>
+                  <Chip
+                    tone={
+                      p.status.level === 'expired' || p.status.level === 'critical'
+                        ? 'error'
+                        : 'warning'
+                    }
+                  >
+                    {p.status.level === 'expired'
+                      ? `منتهٍ منذ ${Math.abs(p.status.days ?? 0)} يوم`
+                      : `${fmtNum(p.status.days)} يوم`}
+                  </Chip>
+                </li>
+              ))}
             </ul>
           )}
         </Card>

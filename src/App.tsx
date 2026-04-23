@@ -1,17 +1,17 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router';
-import Layout from './components/Layout.jsx';
-import { DataProvider } from './store/DataContext.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Inventory from './pages/Inventory.jsx';
-import Suppliers from './pages/Suppliers.jsx';
-import Customers from './pages/Customers.jsx';
-import CustomerStatement from './pages/CustomerStatement.jsx';
-import Invoices from './pages/Invoices.jsx';
-import NewInvoice from './pages/NewInvoice.jsx';
-import InvoiceView from './pages/InvoiceView.jsx';
-import Expiry from './pages/Expiry.jsx';
-import Debts from './pages/Debts.jsx';
-import Settings from './pages/Settings.jsx';
+import Layout from './components/Layout';
+import { DataProvider } from './store/DataContext';
+import Dashboard from './pages/Dashboard';
+import Inventory from './pages/Inventory';
+import Suppliers from './pages/Suppliers';
+import Customers from './pages/Customers';
+import CustomerStatement from './pages/CustomerStatement';
+import Invoices from './pages/Invoices';
+import NewInvoice from './pages/NewInvoice';
+import InvoiceView from './pages/InvoiceView';
+import Expiry from './pages/Expiry';
+import Debts from './pages/Debts';
+import Settings from './pages/Settings';
 
 export default function App() {
   return (

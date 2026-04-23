@@ -3,7 +3,6 @@ import {
   Card,
   Chip,
   EmptyState,
-  Icon,
   SectionHeader,
   Select,
   StatCard,
@@ -11,9 +10,9 @@ import {
   Td,
   TextField,
   Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { bestSupplierPrice } from '../utils/calc.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { bestSupplierPrice } from '../utils/calc';
 import {
   expiryStatus,
   fmtDate,
@@ -21,24 +20,28 @@ import {
   fmtNum,
   fmtSyp,
   fmtUsd,
-} from '../utils/format.js';
+} from '../utils/format';
+import type { ExpiryLevel } from '../types';
 
-const LEVEL_ORDER = { expired: 0, critical: 1, warning: 2, ok: 3, unknown: 4 };
+const LEVEL_ORDER: Record<ExpiryLevel, number> = {
+  expired: 0,
+  critical: 1,
+  warning: 2,
+  ok: 3,
+  unknown: 4,
+};
 
 export default function Expiry() {
   const { db } = useData();
   const { products, suppliers, settings } = db;
   const [search, setSearch] = useState('');
-  const [levelFilter, setLevelFilter] = useState('');
-  const [thresholdDays, setThresholdDays] = useState(settings.nearExpiryDays);
+  const [levelFilter, setLevelFilter] = useState<'' | ExpiryLevel>('');
+  const [thresholdDays, setThresholdDays] = useState<number>(settings.nearExpiryDays);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products
-      .map((p) => {
-        const status = expiryStatus(p.expiry, thresholdDays);
-        return { ...p, status };
-      })
+      .map((p) => ({ ...p, status: expiryStatus(p.expiry, thresholdDays) }))
       .filter((p) => {
         if (q && !(p.name.toLowerCase().includes(q) || p.barcode?.includes(q))) return false;
         if (levelFilter && p.status.level !== levelFilter) return false;
@@ -52,9 +55,15 @@ export default function Expiry() {
   }, [products, search, levelFilter, thresholdDays]);
 
   const stats = useMemo(() => {
-    const expired = products.filter((p) => expiryStatus(p.expiry, thresholdDays).level === 'expired').length;
-    const critical = products.filter((p) => expiryStatus(p.expiry, thresholdDays).level === 'critical').length;
-    const warning = products.filter((p) => expiryStatus(p.expiry, thresholdDays).level === 'warning').length;
+    const expired = products.filter(
+      (p) => expiryStatus(p.expiry, thresholdDays).level === 'expired',
+    ).length;
+    const critical = products.filter(
+      (p) => expiryStatus(p.expiry, thresholdDays).level === 'critical',
+    ).length;
+    const warning = products.filter(
+      (p) => expiryStatus(p.expiry, thresholdDays).level === 'warning',
+    ).length;
     const lossUsd = products.reduce((s, p) => {
       const st = expiryStatus(p.expiry, thresholdDays);
       if (st.level !== 'expired' && st.level !== 'critical') return s;
@@ -65,7 +74,7 @@ export default function Expiry() {
     return { expired, critical, warning, lossUsd };
   }, [products, thresholdDays]);
 
-  const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
+  const supplierName = (id: string) => suppliers.find((s) => s.id === id)?.name || '—';
 
   return (
     <div className="space-y-6">
@@ -77,8 +86,18 @@ export default function Expiry() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard icon="event_busy" tone="error" label="منتهٍ" value={fmtInt(stats.expired)} />
-        <StatCard icon="warning" tone="error" label="حرج (≤ 30 يوم)" value={fmtInt(stats.critical)} />
-        <StatCard icon="schedule" tone="tertiary" label={`قريب (≤ ${thresholdDays} يوم)`} value={fmtInt(stats.warning)} />
+        <StatCard
+          icon="warning"
+          tone="error"
+          label="حرج (≤ 30 يوم)"
+          value={fmtInt(stats.critical)}
+        />
+        <StatCard
+          icon="schedule"
+          tone="tertiary"
+          label={`قريب (≤ ${thresholdDays} يوم)`}
+          value={fmtInt(stats.warning)}
+        />
         <StatCard
           icon="trending_down"
           tone="error"
@@ -99,7 +118,7 @@ export default function Expiry() {
           <Select
             icon="filter_list"
             value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value)}
+            onChange={(e) => setLevelFilter(e.target.value as '' | ExpiryLevel)}
             placeholder="كل الحالات"
             options={[
               { value: 'expired', label: 'منتهٍ' },
@@ -112,7 +131,7 @@ export default function Expiry() {
             type="number"
             icon="event"
             value={thresholdDays}
-            onChange={(e) => setThresholdDays(Math.max(1, +e.target.value || 90))}
+            onChange={(e) => setThresholdDays(Math.max(1, Number(e.target.value) || 90))}
             suffix="يوم (العتبة)"
           />
         </div>
@@ -178,7 +197,7 @@ export default function Expiry() {
                       icon={p.status.level === 'ok' ? 'check_circle' : 'schedule'}
                     >
                       {p.status.level === 'expired'
-                        ? `منتهٍ منذ ${Math.abs(p.status.days)} يوم`
+                        ? `منتهٍ منذ ${Math.abs(p.status.days ?? 0)} يوم`
                         : p.status.days !== null
                         ? `${fmtNum(p.status.days)} يوم`
                         : '—'}

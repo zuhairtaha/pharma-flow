@@ -1,8 +1,28 @@
-import { useEffect, useId, useRef } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ChangeEventHandler,
+  type ElementType,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { createPortal } from 'react-dom';
 
-// ---------- Icon (Material Symbols Rounded) ----------
-export function Icon({ name, className = '', filled = false, size, style }) {
+// ---------- Icon ----------
+export interface IconProps {
+  name: string;
+  className?: string;
+  filled?: boolean;
+  size?: number | string;
+  style?: CSSProperties;
+}
+
+export function Icon({ name, className = '', filled = false, size, style }: IconProps) {
   return (
     <span
       className={`material-symbols-rounded ${filled ? 'filled' : ''} ${className}`}
@@ -15,7 +35,10 @@ export function Icon({ name, className = '', filled = false, size, style }) {
 }
 
 // ---------- Button ----------
-const btnVariants = {
+export type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'text' | 'error' | 'errorText';
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
+
+const btnVariants: Record<ButtonVariant, string> = {
   filled:
     'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] elev-1 hover:elev-2',
   tonal:
@@ -23,14 +46,29 @@ const btnVariants = {
   outlined:
     'bg-transparent text-[var(--color-primary)] border border-[var(--color-outline)] hover:bg-[var(--color-primary-container)]/40',
   text: 'bg-transparent text-[var(--color-primary)] hover:bg-[var(--color-primary-container)]/40',
-  error:
-    'bg-[var(--color-error)] text-white hover:brightness-110 elev-1',
-  errorText:
-    'bg-transparent text-[var(--color-error)] hover:bg-[var(--color-error-container)]/60',
+  error: 'bg-[var(--color-error)] text-white hover:brightness-110 elev-1',
+  errorText: 'bg-transparent text-[var(--color-error)] hover:bg-[var(--color-error-container)]/60',
 };
 
+const btnSizes: Record<ButtonSize, string> = {
+  sm: 'h-8 px-3 text-sm gap-1',
+  md: 'h-10 px-5 text-sm gap-2',
+  lg: 'h-12 px-6 text-base gap-2',
+  icon: 'h-10 w-10 justify-center',
+};
+
+// Polymorphic-ish: accept any element type via `as`, extend button attributes as base
+export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
+  as?: ElementType;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: string;
+  trailingIcon?: string;
+  type?: 'button' | 'submit' | 'reset';
+}
+
 export function Button({
-  as: Comp = 'button',
+  as,
   variant = 'filled',
   size = 'md',
   icon,
@@ -40,20 +78,15 @@ export function Button({
   disabled,
   type,
   ...rest
-}) {
-  const sizes = {
-    sm: 'h-8 px-3 text-sm gap-1',
-    md: 'h-10 px-5 text-sm gap-2',
-    lg: 'h-12 px-6 text-base gap-2',
-    icon: 'h-10 w-10 justify-center',
-  };
+}: ButtonProps) {
+  const Comp: ElementType = as ?? 'button';
   return (
     <Comp
-      type={Comp === 'button' ? type || 'button' : type}
+      type={Comp === 'button' ? type ?? 'button' : type}
       disabled={disabled}
       className={`md-state inline-flex items-center justify-center rounded-full font-medium select-none
         transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
-        ${btnVariants[variant] || btnVariants.filled} ${sizes[size] || sizes.md} ${className}`}
+        ${btnVariants[variant]} ${btnSizes[size]} ${className}`}
       {...rest}
     >
       {icon ? <Icon name={icon} className="text-[18px]" /> : null}
@@ -64,20 +97,29 @@ export function Button({
 }
 
 // ---------- Icon Button ----------
+export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
+  as?: ElementType;
+  name: string;
+  label: string;
+  filled?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+}
+
 export function IconButton({
-  as: Comp = 'button',
+  as,
   name,
   label,
   className = '',
   filled = false,
   size = 'md',
   ...rest
-}) {
+}: IconButtonProps) {
+  const Comp: ElementType = as ?? 'button';
   const sizes = {
     sm: 'h-8 w-8 text-[18px]',
     md: 'h-10 w-10 text-[20px]',
     lg: 'h-12 w-12 text-[22px]',
-  };
+  } as const;
   const commonProps = {
     'aria-label': label,
     title: label,
@@ -93,19 +135,31 @@ export function IconButton({
 }
 
 // ---------- Card ----------
-export function Card({ children, className = '', as: Comp = 'div', ...rest }) {
+export interface CardProps {
+  children?: ReactNode;
+  className?: string;
+  as?: ElementType;
+  [key: string]: unknown;
+}
+
+export function Card({ children, className = '', as, ...rest }: CardProps) {
+  const Comp: ElementType = as ?? 'div';
   return (
-    <Comp
-      className={`bg-[var(--color-surface)] rounded-3xl elev-1 p-5 ${className}`}
-      {...rest}
-    >
+    <Comp className={`bg-[var(--color-surface)] rounded-3xl elev-1 p-5 ${className}`} {...rest}>
       {children}
     </Comp>
   );
 }
 
 // ---------- Section Header ----------
-export function SectionHeader({ title, subtitle, icon, action }) {
+export interface SectionHeaderProps {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  icon?: string;
+  action?: ReactNode;
+}
+
+export function SectionHeader({ title, subtitle, icon, action }: SectionHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
       <div className="flex items-start gap-3 min-w-0">
@@ -128,24 +182,60 @@ export function SectionHeader({ title, subtitle, icon, action }) {
   );
 }
 
-// ---------- TextField (Material outlined style) ----------
-export function TextField({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  placeholder,
-  icon,
-  suffix,
-  hint,
-  error,
-  className = '',
-  as = 'input',
-  rows = 3,
-  ...rest
-}) {
+// ---------- TextField ----------
+export type TextFieldProps =
+  | ({
+      as?: 'input';
+      label?: string;
+      icon?: string;
+      suffix?: ReactNode;
+      hint?: ReactNode;
+      error?: ReactNode;
+      rows?: number;
+    } & Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>)
+  | ({
+      as: 'textarea';
+      label?: string;
+      icon?: string;
+      suffix?: ReactNode;
+      hint?: ReactNode;
+      error?: ReactNode;
+      rows?: number;
+    } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'>);
+
+export function TextField(props: TextFieldProps) {
   const id = useId();
-  const Cmp = as;
+  const {
+    label,
+    icon,
+    suffix,
+    hint,
+    error,
+    className = '',
+    as = 'input',
+    rows = 3,
+    value,
+    onChange,
+    ...rest
+  } = props as {
+    label?: string;
+    icon?: string;
+    suffix?: ReactNode;
+    hint?: ReactNode;
+    error?: ReactNode;
+    className?: string;
+    as?: 'input' | 'textarea';
+    rows?: number;
+    value?: string | number | readonly string[];
+    onChange?: ChangeEventHandler<HTMLInputElement> | ChangeEventHandler<HTMLTextAreaElement>;
+    [k: string]: unknown;
+  };
+
+  const commonClass =
+    as === 'textarea'
+      ? 'py-2.5 px-3 resize-y min-h-[80px]'
+      : 'h-11 px-3';
+
   return (
     <label htmlFor={id} className={`block ${className}`}>
       {label ? (
@@ -155,7 +245,11 @@ export function TextField({
       ) : null}
       <div
         className={`relative flex items-stretch rounded-xl border bg-[var(--color-surface)]
-          ${error ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)] focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-container)]'}
+          ${
+            error
+              ? 'border-[var(--color-error)]'
+              : 'border-[var(--color-outline-variant)] focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-container)]'
+          }
           transition-colors`}
       >
         {icon ? (
@@ -163,16 +257,24 @@ export function TextField({
             <Icon name={icon} className="text-[18px]" />
           </span>
         ) : null}
-        <Cmp
-          id={id}
-          type={type}
-          value={value ?? ''}
-          onChange={onChange}
-          placeholder={placeholder}
-          rows={as === 'textarea' ? rows : undefined}
-          className={`flex-1 bg-transparent outline-none ${as === 'textarea' ? 'py-2.5 px-3 resize-y min-h-[80px]' : 'h-11 px-3'} text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)]/70`}
-          {...rest}
-        />
+        {as === 'textarea' ? (
+          <textarea
+            id={id}
+            rows={rows}
+            value={value ?? ''}
+            onChange={onChange as ChangeEventHandler<HTMLTextAreaElement>}
+            className={`flex-1 bg-transparent outline-none ${commonClass} text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)]/70`}
+            {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
+          />
+        ) : (
+          <input
+            id={id}
+            value={value ?? ''}
+            onChange={onChange as ChangeEventHandler<HTMLInputElement>}
+            className={`flex-1 bg-transparent outline-none ${commonClass} text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)]/70`}
+            {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+          />
+        )}
         {suffix ? (
           <span className="flex items-center px-3 text-xs text-[var(--color-on-surface-variant)] whitespace-nowrap">
             {suffix}
@@ -189,7 +291,33 @@ export function TextField({
 }
 
 // ---------- Select ----------
-export function Select({ label, value, onChange, options, placeholder, icon, className = '', hint, error, ...rest }) {
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SelectProps
+  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size' | 'placeholder'> {
+  label?: string;
+  icon?: string;
+  hint?: ReactNode;
+  error?: ReactNode;
+  options: SelectOption[];
+  placeholder?: string;
+}
+
+export function Select({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  icon,
+  className = '',
+  hint,
+  error,
+  ...rest
+}: SelectProps) {
   const id = useId();
   return (
     <label htmlFor={id} className={`block ${className}`}>
@@ -200,7 +328,11 @@ export function Select({ label, value, onChange, options, placeholder, icon, cla
       ) : null}
       <div
         className={`relative flex items-stretch rounded-xl border bg-[var(--color-surface)]
-          ${error ? 'border-[var(--color-error)]' : 'border-[var(--color-outline-variant)] focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-container)]'}`}
+          ${
+            error
+              ? 'border-[var(--color-error)]'
+              : 'border-[var(--color-outline-variant)] focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-container)]'
+          }`}
       >
         {icon ? (
           <span className="flex items-center px-3 text-[var(--color-on-surface-variant)]">
@@ -215,7 +347,7 @@ export function Select({ label, value, onChange, options, placeholder, icon, cla
           {...rest}
         >
           {placeholder ? <option value="">{placeholder}</option> : null}
-          {(options || []).map((o) => (
+          {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -235,7 +367,16 @@ export function Select({ label, value, onChange, options, placeholder, icon, cla
 }
 
 // ---------- Chip ----------
-const chipTones = {
+export type ChipTone =
+  | 'neutral'
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'success'
+  | 'warning'
+  | 'error';
+
+const chipTones: Record<ChipTone, string> = {
   neutral: 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]',
   primary: 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)]',
   secondary: 'bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)]',
@@ -245,10 +386,17 @@ const chipTones = {
   error: 'bg-[var(--color-error-container)] text-[var(--color-error)]',
 };
 
-export function Chip({ tone = 'neutral', icon, children, className = '' }) {
+export interface ChipProps {
+  tone?: ChipTone;
+  icon?: string;
+  children?: ReactNode;
+  className?: string;
+}
+
+export function Chip({ tone = 'neutral', icon, children, className = '' }: ChipProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${chipTones[tone] || chipTones.neutral} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${chipTones[tone]} ${className}`}
     >
       {icon ? <Icon name={icon} className="text-[14px]" /> : null}
       {children}
@@ -256,12 +404,23 @@ export function Chip({ tone = 'neutral', icon, children, className = '' }) {
   );
 }
 
-// ---------- Modal ----------
-export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
-  const ref = useRef(null);
+// ---------- Modal (via portal) ----------
+export interface ModalProps {
+  open: boolean;
+  onClose?: () => void;
+  title?: ReactNode;
+  children?: ReactNode;
+  footer?: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+}
+
+export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose?.();
+    };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -278,10 +437,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
     md: 'max-w-xl',
     lg: 'max-w-3xl',
     xl: 'max-w-5xl',
-  };
+  } as const;
 
-  // Portal ensures the modal renders as a direct child of <body>, avoiding
-  // fixed-positioning bugs when an ancestor has transform/filter applied.
   return createPortal(
     <div
       dir="rtl"
@@ -313,7 +470,14 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
 }
 
 // ---------- Empty state ----------
-export function EmptyState({ icon = 'inbox', title, subtitle, action }) {
+export interface EmptyStateProps {
+  icon?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+}
+
+export function EmptyState({ icon = 'inbox', title, subtitle, action }: EmptyStateProps) {
   return (
     <div className="text-center py-12 px-6">
       <div className="h-16 w-16 mx-auto rounded-full bg-[var(--color-surface-variant)] flex items-center justify-center text-[var(--color-on-surface-variant)] mb-4">
@@ -331,7 +495,25 @@ export function EmptyState({ icon = 'inbox', title, subtitle, action }) {
 }
 
 // ---------- Stat card ----------
-export function StatCard({ icon, tone = 'primary', label, value, hint, trend }) {
+export type StatTone = 'primary' | 'secondary' | 'tertiary' | 'error' | 'neutral';
+
+export interface StatCardProps {
+  icon: string;
+  tone?: StatTone;
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  trend?: ReactNode;
+}
+
+export function StatCard({ icon, tone = 'primary', label, value, hint, trend }: StatCardProps) {
+  const toneClass = {
+    primary: 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)]',
+    secondary: 'bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)]',
+    tertiary: 'bg-[var(--color-tertiary-container)] text-[var(--color-on-tertiary-container)]',
+    error: 'bg-[var(--color-error-container)] text-[var(--color-error)]',
+    neutral: 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]',
+  }[tone];
   return (
     <Card className="!p-5">
       <div className="flex items-start justify-between gap-3">
@@ -346,19 +528,7 @@ export function StatCard({ icon, tone = 'primary', label, value, hint, trend }) 
             <div className="mt-1 text-xs text-[var(--color-on-surface-variant)]">{hint}</div>
           ) : null}
         </div>
-        <div
-          className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
-            tone === 'primary'
-              ? 'bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)]'
-              : tone === 'secondary'
-              ? 'bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)]'
-              : tone === 'tertiary'
-              ? 'bg-[var(--color-tertiary-container)] text-[var(--color-on-tertiary-container)]'
-              : tone === 'error'
-              ? 'bg-[var(--color-error-container)] text-[var(--color-error)]'
-              : 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]'
-          }`}
-        >
+        <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${toneClass}`}>
           <Icon name={icon} className="text-[22px]" />
         </div>
       </div>
@@ -372,7 +542,25 @@ export function StatCard({ icon, tone = 'primary', label, value, hint, trend }) 
 }
 
 // ---------- Confirm dialog ----------
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = 'تأكيد', danger }) {
+export interface ConfirmDialogProps {
+  open: boolean;
+  onClose?: () => void;
+  onConfirm?: () => void;
+  title?: ReactNode;
+  message?: ReactNode;
+  confirmLabel?: string;
+  danger?: boolean;
+}
+
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'تأكيد',
+  danger,
+}: ConfirmDialogProps) {
   return (
     <Modal
       open={open}
@@ -402,16 +590,28 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
   );
 }
 
-// ---------- Simple Table wrapper ----------
-export function Table({ children, className = '' }) {
+// ---------- Table primitives ----------
+export interface TableProps {
+  children?: ReactNode;
+  className?: string;
+}
+export function Table({ children, className = '' }: TableProps) {
   return (
-    <div className={`overflow-auto rounded-2xl border border-[var(--color-outline-variant)] bg-[var(--color-surface)] ${className}`}>
+    <div
+      className={`overflow-auto rounded-2xl border border-[var(--color-outline-variant)] bg-[var(--color-surface)] ${className}`}
+    >
       <table className="w-full text-sm">{children}</table>
     </div>
   );
 }
 
-export function Th({ children, className = '', align }) {
+export interface CellProps {
+  children?: ReactNode;
+  className?: string;
+  align?: 'start' | 'end' | 'center';
+}
+
+export function Th({ children, className = '', align }: CellProps) {
   return (
     <th
       className={`px-4 py-3 text-xs font-semibold text-[var(--color-on-surface-variant)] bg-[var(--color-surface-dim)] ${
@@ -423,7 +623,7 @@ export function Th({ children, className = '', align }) {
   );
 }
 
-export function Td({ children, className = '', align }) {
+export function Td({ children, className = '', align }: CellProps) {
   return (
     <td
       className={`px-4 py-3 border-t border-[var(--color-outline-variant)] text-[var(--color-on-surface)] ${

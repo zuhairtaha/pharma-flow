@@ -13,18 +13,14 @@ import {
   Td,
   TextField,
   Th,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import {
-  customerBalanceUsd,
-  genId,
-  invoiceRemainingUsd,
-  invoiceTotalUsd,
-} from '../utils/calc.js';
-import { fmtDate, fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { customerBalanceUsd, genId, invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import type { CustomerPayment } from '../types';
 
 export default function CustomerStatement() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { db, addItem, removeItem } = useData();
   const { customers, invoices, customerPayments, settings } = db;
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -35,17 +31,17 @@ export default function CustomerStatement() {
     () =>
       invoices
         .filter((i) => i.customerId === id)
-        .sort((a, b) => new Date(b.date) - new Date(a.date)),
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [invoices, id],
   );
   const custPayments = useMemo(
     () =>
       customerPayments
         .filter((p) => p.customerId === id)
-        .sort((a, b) => new Date(b.date) - new Date(a.date)),
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [customerPayments, id],
   );
-  const balance = customer ? customerBalanceUsd(id, invoices, customerPayments) : 0;
+  const balance = customer && id ? customerBalanceUsd(id, invoices, customerPayments) : 0;
 
   const totals = useMemo(() => {
     const gross = custInvoices.reduce((s, inv) => s + invoiceTotalUsd(inv), 0);
@@ -54,7 +50,7 @@ export default function CustomerStatement() {
     return { gross, pending, paid };
   }, [custInvoices, custPayments]);
 
-  if (!customer) {
+  if (!customer || !id) {
     return (
       <Card>
         <EmptyState
@@ -63,7 +59,7 @@ export default function CustomerStatement() {
           subtitle="ربما تم حذفه"
           action={
             <Link to="/customers">
-              <Button variant="tonal" icon="arrow_forward">
+              <Button variant="tonal" icon="arrow_forward" as="span">
                 عودة إلى العملاء
               </Button>
             </Link>
@@ -194,7 +190,9 @@ export default function CustomerStatement() {
                     <Td align="end">
                       <div
                         className={`font-semibold tabular-nums ${
-                          remaining > 0.01 ? 'text-[var(--color-error)]' : 'text-[var(--color-success)]'
+                          remaining > 0.01
+                            ? 'text-[var(--color-error)]'
+                            : 'text-[var(--color-success)]'
                         }`}
                       >
                         {fmtUsd(remaining)}
@@ -279,14 +277,22 @@ export default function CustomerStatement() {
   );
 }
 
-function AddPayment({ customerId, exchangeRate, onClose, onSave }) {
-  const [form, setForm] = useState({
+interface AddPaymentProps {
+  customerId: string;
+  exchangeRate: number;
+  onClose: () => void;
+  onSave: (p: CustomerPayment) => void;
+}
+
+function AddPayment({ customerId, exchangeRate, onClose, onSave }: AddPaymentProps) {
+  const [form, setForm] = useState<CustomerPayment>({
+    id: '',
     customerId,
     amountUsd: 0,
     date: new Date().toISOString().slice(0, 10),
     note: '',
   });
-  const patch = (p) => setForm((f) => ({ ...f, ...p }));
+  const patch = (p: Partial<CustomerPayment>) => setForm((f) => ({ ...f, ...p }));
 
   return (
     <Modal
@@ -312,7 +318,7 @@ function AddPayment({ customerId, exchangeRate, onClose, onSave }) {
           step="0.01"
           icon="payments"
           value={form.amountUsd}
-          onChange={(e) => patch({ amountUsd: +e.target.value || 0 })}
+          onChange={(e) => patch({ amountUsd: Number(e.target.value) || 0 })}
           suffix={`≈ ${fmtSyp((form.amountUsd || 0) * exchangeRate)}`}
         />
         <TextField

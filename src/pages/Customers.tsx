@@ -14,19 +14,27 @@ import {
   Table,
   Th,
   Td,
-} from '../components/UI.jsx';
-import { useData } from '../store/DataContext.jsx';
-import { customerBalanceUsd, genId } from '../utils/calc.js';
-import { fmtSyp, fmtUsd } from '../utils/format.js';
+} from '../components/UI';
+import { useData } from '../store/DataContext';
+import { customerBalanceUsd, genId } from '../utils/calc';
+import { fmtSyp, fmtUsd } from '../utils/format';
+import type { Customer } from '../types';
 
-const emptyCustomer = { id: '', name: '', owner: '', phone: '', address: '', notes: '' };
+const emptyCustomer: Customer = {
+  id: '',
+  name: '',
+  owner: '',
+  phone: '',
+  address: '',
+  notes: '',
+};
 
 export default function Customers() {
   const { db, addItem, updateItem, removeItem } = useData();
   const { customers, invoices, customerPayments, settings } = db;
   const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Customer | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -39,7 +47,7 @@ export default function Customers() {
     );
   }, [customers, search]);
 
-  const save = (cust) => {
+  const save = (cust: Customer) => {
     if (cust.id && customers.some((c) => c.id === cust.id)) {
       updateItem('customers', cust.id, cust);
     } else {
@@ -182,7 +190,7 @@ export default function Customers() {
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={() => removeItem('customers', confirmDelete.id)}
+        onConfirm={() => confirmDelete && removeItem('customers', confirmDelete.id)}
         title="حذف عميل"
         message={`هل تريد حذف "${confirmDelete?.name}"؟ لن تُحذف فواتيره السابقة.`}
         confirmLabel="حذف"
@@ -192,10 +200,16 @@ export default function Customers() {
   );
 }
 
-function CustomerEditor({ customer, onClose, onSave }) {
-  const [form, setForm] = useState(customer);
-  const patch = (p) => setForm((f) => ({ ...f, ...p }));
-  const valid = form.name.trim();
+interface CustomerEditorProps {
+  customer: Customer;
+  onClose: () => void;
+  onSave: (c: Customer) => void;
+}
+
+function CustomerEditor({ customer, onClose, onSave }: CustomerEditorProps) {
+  const [form, setForm] = useState<Customer>(customer);
+  const patch = (p: Partial<Customer>) => setForm((f) => ({ ...f, ...p }));
+  const valid = Boolean(form.name.trim());
   return (
     <Modal
       open

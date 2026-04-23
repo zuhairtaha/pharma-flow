@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { Icon, IconButton } from './UI.jsx';
-import { useData } from '../store/DataContext.jsx';
+import { Icon, IconButton } from './UI';
+import { useData } from '../store/DataContext';
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'لوحة التحكم', icon: 'dashboard' },
   { to: '/inventory', label: 'المخزون', icon: 'inventory_2' },
   { to: '/expiry', label: 'الصلاحيات', icon: 'schedule' },
@@ -18,7 +24,7 @@ const NAV_ITEMS = [
 const SIDEBAR_STATE_KEY = 'pharmaflow.sidebar.collapsed';
 
 export default function Layout() {
-  const [collapsed, setCollapsed] = useState(() => {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(SIDEBAR_STATE_KEY) === '1';
     } catch {
@@ -36,11 +42,6 @@ export default function Layout() {
       /* ignore */
     }
   }, [collapsed]);
-
-  // إغلاق القائمة على الهاتف عند تغيير المسار
-  useEffect(() => {
-    setMobileOpen(false);
-  }, []);
 
   return (
     <div className="min-h-screen flex bg-[var(--color-background)]">
@@ -69,7 +70,6 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => {
-              // على الهاتف يغلق، على سطح المكتب يطوي
               if (window.innerWidth < 1024) setMobileOpen(false);
               else setCollapsed((c) => !c);
             }}
@@ -82,7 +82,9 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => navigate('/dashboard')}
-            className={`flex items-center gap-2 min-w-0 text-start md-state rounded-xl px-2 py-1 ${collapsed ? 'lg:hidden' : ''}`}
+            className={`flex items-center gap-2 min-w-0 text-start md-state rounded-xl px-2 py-1 ${
+              collapsed ? 'lg:hidden' : ''
+            }`}
             title={db.settings.companyName}
           >
             <span className="h-9 w-9 shrink-0 rounded-xl bg-[var(--color-primary)] text-white flex items-center justify-center elev-1">
@@ -131,7 +133,6 @@ export default function Layout() {
                       >
                         {item.label}
                       </span>
-                      {/* Tooltip عند الطي */}
                       {collapsed ? (
                         <span className="hidden lg:block absolute right-full ml-0 mr-2 px-2.5 py-1.5 rounded-lg bg-[var(--color-on-surface)] text-white text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap elev-2 z-50">
                           {item.label}
@@ -145,7 +146,7 @@ export default function Layout() {
           </ul>
         </nav>
 
-        {/* Footer — معلومات المالك */}
+        {/* Footer — معلومات المدير */}
         <div className="p-3 border-t border-[var(--color-outline-variant)] shrink-0">
           <div
             className={`flex items-center gap-3 rounded-full p-2 bg-[var(--color-surface-dim)] ${
@@ -193,16 +194,8 @@ export default function Layout() {
             </span>
           </div>
           <div className="flex-1" />
-          <IconButton
-            name="refresh"
-            label="تحديث"
-            onClick={() => window.location.reload()}
-          />
-          <IconButton
-            name="settings"
-            label="الإعدادات"
-            onClick={() => navigate('/settings')}
-          />
+          <IconButton name="refresh" label="تحديث" onClick={() => window.location.reload()} />
+          <IconButton name="settings" label="الإعدادات" onClick={() => navigate('/settings')} />
         </header>
 
         <main className="flex-1 p-4 sm:p-6 print-area">
