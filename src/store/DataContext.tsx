@@ -12,7 +12,7 @@ import type { CollectionItem, CollectionName, Database, Settings } from '../type
 
 // قاعدة بيانات JSON مستمرة عبر localStorage — تعمل كـ"ملف JSON" للتطبيق.
 // عند تغيير شكل البيانات (رفع الإصدار) يُتجاهل المحتوى القديم ويُحمَّل الـ seed الجديد.
-const STORAGE_KEY = 'pharmaflow.db.v4';
+const STORAGE_KEY = 'pharmaflow.db.v5';
 
 const loadDb = (): Database => {
   try {
@@ -42,6 +42,9 @@ export interface DataContextValue {
   removeItem: (collection: CollectionName, id: string) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   resetData: () => void;
+  deleteAllData: () => void;
+  mergeImport: (imported: Database) => void;
+  replaceImport: (imported: Database) => void;
   exportJson: () => string;
 }
 
@@ -126,6 +129,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setDb(structuredClone(seedData));
   }, []);
 
+  // يحذف كل السجلات (موردون/عملاء/أصناف/فواتير...) ويُبقي على إعدادات الشركة كما هي.
+  const deleteAllData = useCallback(() => {
+    setDb((prev) => ({
+      settings: prev.settings,
+      suppliers: [],
+      customers: [],
+      products: [],
+      invoices: [],
+      supplierDebts: [],
+      customerPayments: [],
+    }));
+  }, []);
+
+  // دمج البيانات المستوردة مع الحالية: يُضاف فقط ما ليس له معرّف موجود.
+  // الإعدادات لا تتغير على الدمج.
+  const mergeImport = useCallback((imported: Database) => {
+    const merge = <T extends { id: string }>(existing: T[], incoming: T[] | undefined): T[] => {
+      if (!incoming?.length) return existing;
+      const ids = new Set(existing.map((x) => x.id));
+      const newcomers = incoming.filter((x) => !ids.has(x.id));
+      return [...existing, ...newcomers];
+    };
+    setDb((prev) => ({
+      settings: prev.settings,
+      suppliers: merge(prev.suppliers, imported.suppliers),
+      customers: merge(prev.customers, imported.customers),
+      products: merge(prev.products, imported.products),
+      invoices: merge(prev.invoices, imported.invoices),
+      supplierDebts: merge(prev.supplierDebts, imported.supplierDebts),
+      customerPayments: merge(prev.customerPayments, imported.customerPayments),
+    }));
+  }, []);
+
+  // استبدال كامل بمحتوى الملف المستورد (بما فيه الإعدادات).
+  const replaceImport = useCallback((imported: Database) => {
+    setDb(imported);
+  }, []);
+
   const exportJson = useCallback(() => JSON.stringify(db, null, 2), [db]);
 
   const value = useMemo<DataContextValue>(
@@ -138,9 +179,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
       removeItem,
       updateSettings,
       resetData,
+      deleteAllData,
+      mergeImport,
+      replaceImport,
       exportJson,
     }),
-    [db, updateCollection, addItem, updateItem, removeItem, updateSettings, resetData, exportJson],
+    [
+      db,
+      updateCollection,
+      addItem,
+      updateItem,
+      removeItem,
+      updateSettings,
+      resetData,
+      deleteAllData,
+      mergeImport,
+      replaceImport,
+      exportJson,
+    ],
   );
 
   return <DataContext value={value}>{children}</DataContext>;

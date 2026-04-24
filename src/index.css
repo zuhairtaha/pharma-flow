@@ -189,8 +189,20 @@ input[type="number"] {
 }
 
 /* Print styles */
+.print-only {
+  display: none;
+}
+
 @media print {
   .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: revert !important;
+  }
+  /* عناصر الشيل العامّة التي لا نريدها على الورقة */
+  aside,
+  header[role="banner"] {
     display: none !important;
   }
   body {
@@ -198,6 +210,18 @@ input[type="number"] {
   }
   .print-area {
     padding: 0 !important;
+  }
+  /* طباعة نظيفة للجداول */
+  table {
+    font-size: 11pt;
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
   }
 }
 

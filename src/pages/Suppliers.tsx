@@ -12,7 +12,8 @@ import {
 } from '../components/UI';
 import { useData } from '../store/DataContext';
 import { genId, supplierDebtTotalUsd } from '../utils/calc';
-import { fmtSyp, fmtUsd } from '../utils/format';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { Supplier } from '../types';
 
 const emptySupplier: Supplier = { id: '', name: '', phone: '', address: '', notes: '' };
@@ -51,13 +52,53 @@ export default function Suppliers() {
         title="الموردون"
         subtitle={`${suppliers.length} مورد — معلومات التواصل، الأرصدة، والأصناف الموردة`}
         action={
-          <Button icon="add" onClick={() => setEditing(emptySupplier)}>
-            مورد جديد
-          </Button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <IconButton name="print" label="طباعة" onClick={() => triggerPrint()} />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `suppliers-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { label: 'الاسم', value: (s: Supplier) => s.name },
+                    { label: 'الهاتف', value: (s) => s.phone },
+                    { label: 'العنوان', value: (s) => s.address },
+                    {
+                      label: 'عدد الأصناف',
+                      value: (s) =>
+                        products.filter((p) => p.prices?.some((pp) => pp.supplierId === s.id)).length,
+                    },
+                    {
+                      label: 'الدين المستحق ($)',
+                      value: (s) => +supplierDebtTotalUsd(s.id, supplierDebts).toFixed(2),
+                    },
+                    {
+                      label: 'الدين المستحق (ل.س)',
+                      value: (s) =>
+                        Math.round(supplierDebtTotalUsd(s.id, supplierDebts) * settings.exchangeRate),
+                    },
+                    { label: 'ملاحظات', value: (s) => s.notes },
+                  ],
+                  filtered,
+                )
+              }
+            />
+            <Button icon="add" onClick={() => setEditing(emptySupplier)}>
+              مورد جديد
+            </Button>
+          </div>
         }
       />
 
-      <Card className="!p-4">
+      <div className="print-only text-center mb-4">
+        <h2 className="text-xl font-bold">{settings.companyName || 'كشف الموردين'}</h2>
+        <p className="text-xs">
+          كشف الموردين — {fmtDate(new Date())} · {suppliers.length} مورد
+        </p>
+      </div>
+
+      <Card className="!p-4 no-print">
         <TextField
           placeholder="بحث بالاسم، الهاتف، أو العنوان..."
           icon="search"
@@ -91,7 +132,7 @@ export default function Suppliers() {
                       <p className="text-xs text-[var(--color-on-surface-variant)] mt-0.5">{sup.notes}</p>
                     ) : null}
                   </div>
-                  <div className="flex -me-1">
+                  <div className="flex -me-1 no-print">
                     <IconButton name="edit" label="تعديل" size="sm" onClick={() => setEditing(sup)} />
                     <IconButton
                       name="delete"

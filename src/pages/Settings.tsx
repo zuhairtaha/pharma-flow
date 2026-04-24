@@ -12,11 +12,12 @@ import { fmtSyp } from '../utils/format';
 import type { Settings as SettingsType } from '../types';
 
 export default function Settings() {
-  const { db, updateSettings, resetData, exportJson, setDb } = useData();
+  const { db, updateSettings, resetData, deleteAllData, exportJson, setDb } = useData();
   const { settings } = db;
   const [form, setForm] = useState<SettingsType>(settings);
   const [saved, setSaved] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [importError, setImportError] = useState('');
 
   const patch = (p: Partial<SettingsType>) => {
@@ -184,6 +185,9 @@ export default function Settings() {
           <Button variant="errorText" icon="restart_alt" onClick={() => setConfirmReset(true)}>
             إعادة تهيئة البيانات
           </Button>
+          <Button variant="error" icon="delete_forever" onClick={() => setConfirmDelete(true)}>
+            حذف كل البيانات
+          </Button>
         </div>
         {importError ? (
           <div className="mt-3 p-3 rounded-xl bg-[var(--color-error-container)] text-[var(--color-error)] text-sm">
@@ -200,8 +204,18 @@ export default function Settings() {
           setForm(db.settings);
         }}
         title="إعادة تهيئة البيانات"
-        message="سيتم حذف كل التعديلات واستعادة البيانات التجريبية الأولية. هل تريد المتابعة؟"
+        message="سيتم حذف كل التعديلات واستعادة الإعدادات الافتراضية. هل تريد المتابعة؟"
         confirmLabel="إعادة التهيئة"
+        danger
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={deleteAllData}
+        title="حذف كل البيانات"
+        message="سيتم حذف جميع السجلات (موردون، عملاء، أصناف، فواتير، ديون، دفعات) بشكل نهائي. تبقى إعدادات الشركة كما هي. هذا الإجراء لا يمكن التراجع عنه."
+        confirmLabel="حذف كل البيانات"
         danger
       />
     </div>

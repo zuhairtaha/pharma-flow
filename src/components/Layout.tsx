@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { Button, ConfirmDialog, Icon, IconButton, Modal } from './UI';
+import { Button, Icon, IconButton, Modal } from './UI';
 import { useData } from '../store/DataContext';
 import type { Database } from '../types';
 
@@ -12,7 +12,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'لوحة التحكم', icon: 'dashboard' },
-  { to: '/inventory', label: 'المخزون', icon: 'inventory_2' },
+  { to: '/inventory', label: 'الأصناف', icon: 'inventory_2' },
   { to: '/expiry', label: 'الصلاحيات', icon: 'schedule' },
   { to: '/invoices', label: 'فواتير البيع', icon: 'receipt_long' },
   { to: '/invoices/new', label: 'فاتورة جديدة', icon: 'add_shopping_cart' },
@@ -33,14 +33,16 @@ export default function Layout() {
     }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { db, setDb, exportJson } = useData();
+  const { db, exportJson, mergeImport, replaceImport } = useData();
   const navigate = useNavigate();
 
   // تصدير/استيراد قاعدة البيانات (JSON مخزّن في localStorage)
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingImport, setPendingImport] = useState<Database | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importedAt, setImportedAt] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+
+  const showToast = (text: string) => setToast({ id: Date.now(), text });
 
   const handleExport = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' });
@@ -74,18 +76,25 @@ export default function Layout() {
     e.target.value = '';
   };
 
-  const confirmImport = () => {
+  const handleMerge = () => {
     if (!pendingImport) return;
-    setDb(pendingImport);
+    mergeImport(pendingImport);
     setPendingImport(null);
-    setImportedAt(Date.now());
+    showToast('تمّت إضافة بيانات الملف إلى البيانات الحالية بنجاح.');
+  };
+
+  const handleReplace = () => {
+    if (!pendingImport) return;
+    replaceImport(pendingImport);
+    setPendingImport(null);
+    showToast('تمّ استبدال البيانات بالكامل بنجاح.');
   };
 
   useEffect(() => {
-    if (importedAt === null) return;
-    const t = setTimeout(() => setImportedAt(null), 3500);
+    if (toast === null) return;
+    const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
-  }, [importedAt]);
+  }, [toast]);
 
   useEffect(() => {
     try {
@@ -280,16 +289,49 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* تأكيد الاستيراد */}
-      <ConfirmDialog
+      {/* نافذة خيار الاستيراد: دمج أم استبدال */}
+      <Modal
         open={!!pendingImport}
         onClose={() => setPendingImport(null)}
-        onConfirm={confirmImport}
         title="استيراد قاعدة البيانات"
-        message="سيتم استبدال بيانات التطبيق الحالية بالكامل بمحتوى الملف المختار، وتُحفظ في ذاكرة المتصفح (localStorage). هل تريد المتابعة؟"
-        confirmLabel="استيراد واستبدال"
-        danger
-      />
+        size="md"
+        footer={
+          <>
+            <Button variant="text" onClick={() => setPendingImport(null)}>
+              إلغاء
+            </Button>
+            <Button variant="tonal" icon="playlist_add" onClick={handleMerge}>
+              إضافة البيانات
+            </Button>
+            <Button variant="error" icon="swap_horiz" onClick={handleReplace}>
+              استبدال كل المحتوى
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm leading-7 text-[var(--color-on-surface-variant)]">
+          <p>اختر كيف تريد التعامل مع بيانات الملف المستورد:</p>
+          <div className="p-3 rounded-2xl bg-[var(--color-surface-dim)] flex items-start gap-3">
+            <Icon name="playlist_add" className="text-[var(--color-primary)] text-[22px] mt-0.5" />
+            <div>
+              <div className="font-semibold text-[var(--color-on-surface)]">إضافة البيانات</div>
+              <p className="text-xs mt-0.5">
+                تُضاف السجلات الجديدة فقط (ذات المعرّفات غير الموجودة حالياً) إلى بياناتك. لا تتغيّر
+                الإعدادات الحالية.
+              </p>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-[var(--color-error-container)]/50 flex items-start gap-3">
+            <Icon name="swap_horiz" className="text-[var(--color-error)] text-[22px] mt-0.5" />
+            <div>
+              <div className="font-semibold text-[var(--color-on-surface)]">استبدال كل المحتوى</div>
+              <p className="text-xs mt-0.5">
+                يُمسح كل المحتوى الحالي (بما فيه الإعدادات) ويُستبدل بمحتوى الملف.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* رسالة خطأ عند فشل الاستيراد */}
       <Modal
@@ -309,14 +351,15 @@ export default function Layout() {
         </div>
       </Modal>
 
-      {/* إشعار نجاح الاستيراد */}
-      {importedAt !== null ? (
+      {/* Snackbar — نجاح العملية */}
+      {toast ? (
         <div
+          key={toast.id}
           role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-full elev-3 bg-[var(--color-success-container)] text-[var(--color-success)] text-sm font-semibold flex items-center gap-2 animate-fade-in"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] px-4 py-3 rounded-full elev-3 bg-[var(--color-success-container)] text-[var(--color-success)] text-sm font-semibold flex items-center gap-2 animate-fade-in"
         >
           <Icon name="check_circle" filled />
-          تمّ استيراد قاعدة البيانات بنجاح
+          <span>{toast.text}</span>
         </div>
       ) : null}
     </div>

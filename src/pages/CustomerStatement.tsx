@@ -18,6 +18,7 @@ import { useData } from '../store/DataContext';
 import { customerBalanceUsd, genId, invoiceRemainingUsd, invoiceTotalUsd } from '../utils/calc';
 import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { CustomerPayment, Invoice } from '../types';
 
 export default function CustomerStatement() {
@@ -109,6 +110,37 @@ export default function CustomerStatement() {
                 الرجوع
               </Button>
             </Link>
+            <IconButton name="print" label="طباعة" onClick={() => triggerPrint()} />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `statement-${customer.name.replace(/\s+/g, '-')}-${new Date()
+                    .toISOString()
+                    .slice(0, 10)}`,
+                  [
+                    { label: 'الرقم', value: (i: Invoice) => i.number },
+                    { label: 'التاريخ', value: (i) => i.date.slice(0, 10) },
+                    { label: 'عدد الأصناف', value: (i) => i.items?.length ?? 0 },
+                    { label: 'الإجمالي ($)', value: (i) => +invoiceTotalUsd(i).toFixed(2) },
+                    {
+                      label: 'الإجمالي (ل.س)',
+                      value: (i) =>
+                        Math.round(invoiceTotalUsd(i) * (i.exchangeRate || settings.exchangeRate)),
+                    },
+                    { label: 'المدفوع ($)', value: (i) => +i.paidUsd.toFixed(2) },
+                    { label: 'المتبقي ($)', value: (i) => +invoiceRemainingUsd(i).toFixed(2) },
+                    {
+                      label: 'طريقة الدفع',
+                      value: (i) => (i.paymentType === 'cash' ? 'نقدي' : 'مدين'),
+                    },
+                    { label: 'ملاحظات', value: (i) => i.notes },
+                  ],
+                  sortedInvoices,
+                )
+              }
+            />
             <Button variant="tonal" icon="payments" onClick={() => setPaymentOpen(true)}>
               تسجيل دفعة
             </Button>

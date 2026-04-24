@@ -25,6 +25,7 @@ import {
 } from '../utils/calc';
 import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { Product, Settings, Supplier, SupplierPrice } from '../types';
 
 type ProductDraft = Omit<Product, 'id'> & { id: string };
@@ -120,16 +121,79 @@ export default function Inventory() {
     <div className="space-y-6">
       <SectionHeader
         icon="inventory_2"
-        title="المخزون"
+        title="الأصناف"
         subtitle="إدارة الأصناف وأسعار الموردين وتواريخ الصلاحية"
         action={
-          <Button icon="add" onClick={() => setEditing({ ...emptyProduct, prices: [] })}>
-            صنف جديد
-          </Button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <IconButton
+              name="print"
+              label="طباعة"
+              onClick={() => triggerPrint()}
+            />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `items-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { label: 'الصنف', value: (p: Product) => p.name },
+                    { label: 'الباركود', value: (p) => p.barcode },
+                    { label: 'المصدر', value: (p) => p.source },
+                    { label: 'الوحدة', value: (p) => p.unit },
+                    { label: 'الكمية', value: (p) => p.quantity },
+                    { label: 'تاريخ الصلاحية', value: (p) => p.expiry },
+                    {
+                      label: 'أفضل سعر شراء ($)',
+                      value: (p) => bestSupplierPrice(p)?.priceUsd ?? '',
+                    },
+                    { label: 'هامش البيع للصيدلية %', value: (p) => p.profitPharmacy },
+                    {
+                      label: 'سعر البيع للصيدلية ($)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best ? +sellPriceUsd(best.priceUsd, p.profitPharmacy).toFixed(4) : '';
+                      },
+                    },
+                    {
+                      label: 'سعر البيع للصيدلية (ل.س)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best
+                          ? Math.round(sellPriceSyp(best.priceUsd, p.profitPharmacy, settings.exchangeRate))
+                          : '';
+                      },
+                    },
+                    { label: 'هامش التوزيع %', value: (p) => p.profitDist },
+                    {
+                      label: 'سعر التوزيع ($)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best ? +sellPriceUsd(best.priceUsd, p.profitDist).toFixed(4) : '';
+                      },
+                    },
+                    {
+                      label: 'سعر التوزيع (ل.س)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best
+                          ? Math.round(sellPriceSyp(best.priceUsd, p.profitDist, settings.exchangeRate))
+                          : '';
+                      },
+                    },
+                  ],
+                  rows,
+                )
+              }
+            />
+            <Button icon="add" onClick={() => setEditing({ ...emptyProduct, prices: [] })}>
+              صنف جديد
+            </Button>
+          </div>
         }
       />
 
-      <Card className="!p-4">
+      <Card className="!p-4 no-print">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <TextField
             placeholder="بحث بالاسم أو الباركود..."
@@ -158,6 +222,16 @@ export default function Inventory() {
         </p>
       </Card>
 
+      {/* ترويسة تظهر فقط عند الطباعة */}
+      <div className="print-only text-center mb-4">
+        <h2 className="text-xl font-bold">{settings.companyName || 'كشف الأصناف'}</h2>
+        <p className="text-xs">
+          كشف الأصناف — {fmtDate(new Date())}
+          {' · '}
+          سعر الصرف: 1$ = {fmtInt(settings.exchangeRate)} ل.س
+        </p>
+      </div>
+
       {rows.length === 0 ? (
         <Card>
           <EmptyState
@@ -171,14 +245,17 @@ export default function Inventory() {
           <thead>
             <tr>
               <Th {...sortProps('name')}>الصنف</Th>
-              <Th {...sortProps('barcode')}>الباركود</Th>
-              <Th {...sortProps('source')}>المصدر</Th>
-              <Th align="center" {...sortProps('quantity')}>الكمية</Th>
-              <Th align="end" {...sortProps('bestPrice')}>أفضل سعر شراء</Th>
-              <Th align="end" {...sortProps('pharmacyPrice')}>سعر البيع للصيدلية</Th>
-              <Th align="end" {...sortProps('distPrice')}>سعر التوزيع (جملة)</Th>
-              <Th align="center" {...sortProps('expiry')}>الصلاحية</Th>
-              <Th align="center">الإجراءات</Th>
+              <Th className="no-print" {...sortProps('barcode')}>الباركود</Th>
+              <Th className="no-print" {...sortProps('source')}>المصدر</Th>
+              <Th className="no-print" align="center" {...sortProps('quantity')}>الكمية</Th>
+              <Th className="no-print" align="end" {...sortProps('bestPrice')}>أفضل سعر شراء</Th>
+              <Th className="no-print" align="end" {...sortProps('pharmacyPrice')}>سعر البيع للصيدلية</Th>
+              {/* أعمدة الطباعة فقط — سعر البيع للصيدلية مُقسَّم */}
+              <Th className="print-only" align="end">سعر البيع للصيدلية (ل.س)</Th>
+              <Th className="print-only" align="end">سعر البيع للصيدلية ($)</Th>
+              <Th className="no-print" align="end" {...sortProps('distPrice')}>سعر التوزيع (جملة)</Th>
+              <Th className="no-print" align="center" {...sortProps('expiry')}>الصلاحية</Th>
+              <Th className="no-print" align="center">الإجراءات</Th>
             </tr>
           </thead>
           <tbody>
@@ -207,15 +284,15 @@ export default function Inventory() {
                       ) : null}
                     </div>
                   </Td>
-                  <Td>
+                  <Td className="no-print">
                     <span className="text-xs tabular-nums text-[var(--color-on-surface-variant)]">
                       {p.barcode || '—'}
                     </span>
                   </Td>
-                  <Td>
+                  <Td className="no-print">
                     <Chip tone="neutral">{p.source || '—'}</Chip>
                   </Td>
-                  <Td align="center">
+                  <Td className="no-print" align="center">
                     <div className="inline-flex items-center gap-1">
                       <span
                         className={`font-semibold tabular-nums ${
@@ -230,7 +307,7 @@ export default function Inventory() {
                       ) : null}
                     </div>
                   </Td>
-                  <Td align="end">
+                  <Td className="no-print" align="end">
                     {best ? (
                       <>
                         <div className="font-medium tabular-nums">{fmtUsd(best.priceUsd)}</div>
@@ -244,19 +321,26 @@ export default function Inventory() {
                       <span className="text-xs text-[var(--color-on-surface-variant)]">لم يُحدّد</span>
                     )}
                   </Td>
-                  <Td align="end">
+                  <Td className="no-print" align="end">
                     <div className="font-semibold tabular-nums">{fmtSyp(retailSyp)}</div>
                     <div className="text-xs text-[var(--color-on-surface-variant)] tabular-nums">
                       {fmtUsd(retailUsd)} · +{p.profitPharmacy}%
                     </div>
                   </Td>
-                  <Td align="end">
+                  {/* أعمدة الطباعة فقط — قيمة منفردة لكل عملة */}
+                  <Td className="print-only" align="end">
+                    <span className="tabular-nums">{best ? fmtSyp(retailSyp) : '—'}</span>
+                  </Td>
+                  <Td className="print-only" align="end">
+                    <span className="tabular-nums">{best ? fmtUsd(retailUsd) : '—'}</span>
+                  </Td>
+                  <Td className="no-print" align="end">
                     <div className="font-medium tabular-nums">{fmtSyp(wholesaleSyp)}</div>
                     <div className="text-xs text-[var(--color-on-surface-variant)] tabular-nums">
                       {fmtUsd(wholesaleUsd)} · +{p.profitDist}%
                     </div>
                   </Td>
-                  <Td align="center">
+                  <Td className="no-print" align="center">
                     <Chip
                       tone={
                         ex.level === 'expired'
@@ -279,7 +363,7 @@ export default function Inventory() {
                       {fmtDate(p.expiry)}
                     </div>
                   </Td>
-                  <Td align="center">
+                  <Td className="no-print" align="center">
                     <div className="inline-flex items-center">
                       <IconButton name="edit" label="تعديل" onClick={() => setEditing(p)} size="sm" />
                       <IconButton

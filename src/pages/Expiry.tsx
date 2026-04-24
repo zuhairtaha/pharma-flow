@@ -3,6 +3,7 @@ import {
   Card,
   Chip,
   EmptyState,
+  IconButton,
   SectionHeader,
   Select,
   StatCard,
@@ -22,6 +23,7 @@ import {
   fmtUsd,
 } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { ExpiryLevel, Product, Supplier } from '../types';
 
 type ExpiryRow = Product & { status: ReturnType<typeof expiryStatus> };
@@ -113,6 +115,64 @@ export default function Expiry() {
         icon="schedule"
         title="متابعة الصلاحيات"
         subtitle="الأصناف القريبة من الانتهاء أو المنتهية"
+        action={
+          <div className="flex items-center gap-1">
+            <IconButton name="print" label="طباعة" onClick={() => triggerPrint()} />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `expiry-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { label: 'الصنف', value: (p: Product) => p.name },
+                    { label: 'الباركود', value: (p) => p.barcode },
+                    { label: 'المصدر', value: (p) => p.source },
+                    { label: 'الكمية', value: (p) => p.quantity },
+                    { label: 'الوحدة', value: (p) => p.unit },
+                    { label: 'تاريخ الصلاحية', value: (p) => p.expiry },
+                    {
+                      label: 'الأيام المتبقية',
+                      value: (p) => expiryStatus(p.expiry, thresholdDays).days ?? '',
+                    },
+                    {
+                      label: 'الحالة',
+                      value: (p) => {
+                        const s = expiryStatus(p.expiry, thresholdDays).level;
+                        return s === 'expired'
+                          ? 'منتهٍ'
+                          : s === 'critical'
+                          ? 'حرج'
+                          : s === 'warning'
+                          ? 'قريب الانتهاء'
+                          : s === 'ok'
+                          ? 'صالح'
+                          : '';
+                      },
+                    },
+                    {
+                      label: 'قيمة المخزون ($)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best ? +(best.priceUsd * (p.quantity || 0)).toFixed(2) : '';
+                      },
+                    },
+                    {
+                      label: 'قيمة المخزون (ل.س)',
+                      value: (p) => {
+                        const best = bestSupplierPrice(p);
+                        return best
+                          ? Math.round(best.priceUsd * (p.quantity || 0) * settings.exchangeRate)
+                          : '';
+                      },
+                    },
+                  ],
+                  rows,
+                )
+              }
+            />
+          </div>
+        }
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -138,7 +198,14 @@ export default function Expiry() {
         />
       </div>
 
-      <Card className="!p-4">
+      <div className="print-only text-center mb-4">
+        <h2 className="text-xl font-bold">{settings.companyName || 'كشف الصلاحيات'}</h2>
+        <p className="text-xs">
+          كشف الصلاحيات — {fmtDate(new Date())} · {rows.length} صنف
+        </p>
+      </div>
+
+      <Card className="!p-4 no-print">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <TextField
             placeholder="بحث باسم الصنف أو الباركود..."

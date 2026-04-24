@@ -17,8 +17,9 @@ import {
 } from '../components/UI';
 import { useData } from '../store/DataContext';
 import { customerBalanceUsd, genId } from '../utils/calc';
-import { fmtSyp, fmtUsd } from '../utils/format';
+import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { Customer } from '../types';
 
 const emptyCustomer: Customer = {
@@ -83,13 +84,60 @@ export default function Customers() {
         title="الصيدليات / العملاء"
         subtitle={`${customers.length} صيدلية عميلة — الأرصدة وكشوف الحساب`}
         action={
-          <Button icon="add_business" onClick={() => setEditing(emptyCustomer)}>
-            صيدلية/عميل جديد
-          </Button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <IconButton name="print" label="طباعة" onClick={() => triggerPrint()} />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `customers-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { label: 'الاسم', value: (c: Customer) => c.name },
+                    { label: 'الصيدلي/المسؤول', value: (c) => c.owner },
+                    { label: 'الهاتف', value: (c) => c.phone },
+                    { label: 'العنوان', value: (c) => c.address },
+                    {
+                      label: 'عدد الفواتير',
+                      value: (c) => invoices.filter((i) => i.customerId === c.id).length,
+                    },
+                    {
+                      label: 'الرصيد ($)',
+                      value: (c) =>
+                        +customerBalanceUsd(c.id, invoices, customerPayments).toFixed(2),
+                    },
+                    {
+                      label: 'الرصيد (ل.س)',
+                      value: (c) =>
+                        Math.round(
+                          customerBalanceUsd(c.id, invoices, customerPayments) *
+                            settings.exchangeRate,
+                        ),
+                    },
+                    { label: 'ملاحظات', value: (c) => c.notes },
+                  ],
+                  rows,
+                )
+              }
+            />
+            <Button icon="add_business" onClick={() => setEditing(emptyCustomer)}>
+              صيدلية/عميل جديد
+            </Button>
+          </div>
         }
       />
 
-      <Card className="!p-4">
+      {/* ترويسة تظهر فقط عند الطباعة */}
+      <div className="print-only text-center mb-4">
+        <h2 className="text-xl font-bold">{settings.companyName || 'كشف الصيدليات/العملاء'}</h2>
+        <p className="text-xs">
+          كشف الصيدليات/العملاء — {fmtDate(new Date())}
+          {' · '}
+          {customers.length} سجل
+        </p>
+      </div>
+
+      <Card className="!p-4 no-print">
         <TextField
           placeholder="بحث بالاسم، الهاتف، أو العنوان..."
           icon="search"
@@ -111,7 +159,7 @@ export default function Customers() {
               <Th {...sortProps('address')}>العنوان</Th>
               <Th align="center" {...sortProps('invoiceCount')}>الفواتير</Th>
               <Th align="end" {...sortProps('balance')}>الرصيد</Th>
-              <Th align="center">الإجراءات</Th>
+              <Th className="no-print" align="center">الإجراءات</Th>
             </tr>
           </thead>
           <tbody>
@@ -180,7 +228,7 @@ export default function Customers() {
                       </Chip>
                     )}
                   </Td>
-                  <Td align="center">
+                  <Td className="no-print" align="center">
                     <div className="inline-flex items-center">
                       <Link to={`/customers/${c.id}`} title="كشف حساب">
                         <IconButton name="description" label="كشف حساب" size="sm" as="span" />

@@ -19,6 +19,7 @@ import { useData } from '../store/DataContext';
 import { genId } from '../utils/calc';
 import { fmtDate, fmtSyp, fmtUsd } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
+import { exportToCsv, triggerPrint } from '../utils/export';
 import type { Supplier, SupplierDebt } from '../types';
 
 const emptyDebt: SupplierDebt = {
@@ -93,11 +94,42 @@ export default function Debts() {
         title="ديون الموردين"
         subtitle="المبالغ المستحقة للموردين وسجل التسديد"
         action={
-          <Button icon="add" onClick={() => setEditing(emptyDebt)}>
-            تسجيل دين جديد
-          </Button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <IconButton name="print" label="طباعة" onClick={() => triggerPrint()} />
+            <IconButton
+              name="table_view"
+              label="تصدير Excel"
+              onClick={() =>
+                exportToCsv(
+                  `supplier-debts-${new Date().toISOString().slice(0, 10)}`,
+                  [
+                    { label: 'المورد', value: (d: SupplierDebt) => supplierName(d.supplierId) },
+                    { label: 'التاريخ', value: (d) => d.date.slice(0, 10) },
+                    { label: 'المبلغ ($)', value: (d) => +d.amountUsd.toFixed(2) },
+                    {
+                      label: 'المبلغ (ل.س)',
+                      value: (d) => Math.round(d.amountUsd * settings.exchangeRate),
+                    },
+                    { label: 'الحالة', value: (d) => (d.paid ? 'مسدّد' : 'غير مسدّد') },
+                    { label: 'الملاحظة', value: (d) => d.note },
+                  ],
+                  rows,
+                )
+              }
+            />
+            <Button icon="add" onClick={() => setEditing(emptyDebt)}>
+              تسجيل دين جديد
+            </Button>
+          </div>
         }
       />
+
+      <div className="print-only text-center mb-4">
+        <h2 className="text-xl font-bold">{settings.companyName || 'كشف ديون الموردين'}</h2>
+        <p className="text-xs">
+          كشف ديون الموردين — {fmtDate(new Date())} · {rows.length} سجل
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
@@ -122,7 +154,7 @@ export default function Debts() {
         />
       </div>
 
-      <Card className="!p-4">
+      <Card className="!p-4 no-print">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Select
             label="الحالة"
@@ -159,7 +191,7 @@ export default function Debts() {
               <Th {...sortProps('date')}>التاريخ</Th>
               <Th align="end" {...sortProps('amount')}>المبلغ</Th>
               <Th align="center" {...sortProps('status')}>الحالة</Th>
-              <Th align="center">الإجراءات</Th>
+              <Th className="no-print" align="center">الإجراءات</Th>
             </tr>
           </thead>
           <tbody>
@@ -195,7 +227,7 @@ export default function Debts() {
                     </Chip>
                   )}
                 </Td>
-                <Td align="center">
+                <Td className="no-print" align="center">
                   <div className="inline-flex items-center">
                     <IconButton
                       name={d.paid ? 'undo' : 'done_all'}
