@@ -4,6 +4,7 @@ import {
   Card,
   ConfirmDialog,
   Icon,
+  NumberField,
   SectionHeader,
   TextField,
 } from '../components/UI';
@@ -108,49 +109,49 @@ export default function Settings() {
           <Icon name="currency_exchange" /> سعر الصرف وهوامش الربح
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <TextField
+          <NumberField
             label="سعر صرف الدولار مقابل الليرة السورية"
             icon="currency_exchange"
-            type="number"
             value={form.exchangeRate}
-            onChange={(e) => patch({ exchangeRate: Number(e.target.value) || 0 })}
+            onChange={(v) => patch({ exchangeRate: v })}
             suffix="ل.س / 1$"
             hint={`حالياً: 1$ = ${fmtSyp(form.exchangeRate)}`}
+            min={0}
           />
-          <TextField
+          <NumberField
             label="عتبة المخزون المنخفض"
             icon="warning"
-            type="number"
             value={form.lowStockThreshold}
-            onChange={(e) => patch({ lowStockThreshold: Number(e.target.value) || 0 })}
+            onChange={(v) => patch({ lowStockThreshold: v })}
             suffix="وحدة"
+            min={0}
           />
-          <TextField
+          <NumberField
             label="هامش التوزيع الفرعي الافتراضي (موزعون ثانويون)"
             icon="trending_up"
-            type="number"
             value={form.defaultProfitDist}
-            onChange={(e) => patch({ defaultProfitDist: Number(e.target.value) || 0 })}
+            onChange={(v) => patch({ defaultProfitDist: v })}
             suffix="%"
             hint="يُطبَّق عادةً على الموزعين الثانويين والعملاء الكبار"
+            min={0}
           />
-          <TextField
+          <NumberField
             label="هامش البيع للصيدلية الافتراضي"
             icon="storefront"
-            type="number"
             value={form.defaultProfitPharmacy}
-            onChange={(e) => patch({ defaultProfitPharmacy: Number(e.target.value) || 0 })}
+            onChange={(v) => patch({ defaultProfitPharmacy: v })}
             suffix="%"
             hint="يُطبَّق عند البيع المباشر للصيدليات"
+            min={0}
           />
-          <TextField
+          <NumberField
             label="عتبة التنبيه قرب الانتهاء"
             icon="schedule"
-            type="number"
             value={form.nearExpiryDays}
-            onChange={(e) => patch({ nearExpiryDays: Number(e.target.value) || 0 })}
+            onChange={(v) => patch({ nearExpiryDays: v })}
             suffix="يوم"
             className="md:col-span-2"
+            min={0}
           />
         </div>
         <div className="mt-5 flex items-center justify-end gap-3">

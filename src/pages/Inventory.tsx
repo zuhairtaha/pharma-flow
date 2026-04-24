@@ -8,6 +8,7 @@ import {
   Icon,
   IconButton,
   Modal,
+  NumberField,
   SectionHeader,
   Select,
   Table,
@@ -23,7 +24,7 @@ import {
   sellPriceUsd,
   worstSupplierPrice,
 } from '../utils/calc';
-import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
+import { expiryStatus, fmtDate, fmtExpiry, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
 import { type Comparators, strCmp, useSortable } from '../hooks/useSortable';
 import { exportToCsv, triggerPrint } from '../utils/export';
 import type { Product, Settings, Supplier, SupplierPrice } from '../types';
@@ -360,7 +361,7 @@ export default function Inventory() {
                         : '—'}
                     </Chip>
                     <div className="text-[11px] text-[var(--color-on-surface-variant)] mt-1">
-                      {fmtDate(p.expiry)}
+                      {fmtExpiry(p.expiry)}
                     </div>
                   </Td>
                   <Td className="no-print" align="center">
@@ -449,7 +450,7 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }: Produc
     ? sellPriceSyp(best.priceUsd, form.profitDist, settings.exchangeRate)
     : 0;
 
-  const valid = Boolean(form.name.trim() && form.expiry && form.prices.length > 0);
+  const valid = Boolean(form.name.trim() && form.prices.length > 0);
 
   return (
     <Modal
@@ -505,37 +506,37 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }: Produc
           ]}
         />
         <TextField
-          label="تاريخ الصلاحية *"
-          type="date"
+          label="تاريخ الصلاحية (شهر/سنة — اختياري)"
+          type="month"
           icon="event"
-          value={form.expiry}
+          value={form.expiry ? form.expiry.slice(0, 7) : ''}
           onChange={(e) => patch({ expiry: e.target.value })}
         />
-        <TextField
+        <NumberField
           label="الكمية المتوفرة"
-          type="number"
           icon="inventory"
           value={form.quantity}
-          onChange={(e) => patch({ quantity: Math.max(0, Number(e.target.value) || 0) })}
+          onChange={(v) => patch({ quantity: v })}
           suffix={form.unit}
+          min={0}
         />
-        <TextField
+        <NumberField
           label="هامش التوزيع الفرعي (%)"
-          type="number"
           icon="trending_up"
           value={form.profitDist}
-          onChange={(e) => patch({ profitDist: Number(e.target.value) || 0 })}
+          onChange={(v) => patch({ profitDist: v })}
           suffix="%"
           hint="يُطبَّق على الموزعين الثانويين"
+          min={0}
         />
-        <TextField
+        <NumberField
           label="هامش البيع للصيدلية (%)"
-          type="number"
           icon="storefront"
           value={form.profitPharmacy}
-          onChange={(e) => patch({ profitPharmacy: Number(e.target.value) || 0 })}
+          onChange={(v) => patch({ profitPharmacy: v })}
           suffix="%"
           hint="يُطبَّق على الصيدليات المباشرة"
+          min={0}
         />
       </div>
 
@@ -579,13 +580,12 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }: Produc
                     />
                   </div>
                   <div className="col-span-8 sm:col-span-4">
-                    <TextField
+                    <NumberField
                       label="السعر ($)"
-                      type="number"
-                      step="0.01"
                       value={p.priceUsd}
-                      onChange={(e) => updatePrice(i, { priceUsd: Number(e.target.value) || 0 })}
+                      onChange={(v) => updatePrice(i, { priceUsd: v })}
                       suffix={`≈ ${fmtSyp(p.priceUsd * settings.exchangeRate)}`}
+                      min={0}
                     />
                   </div>
                   <div className="col-span-4 sm:col-span-2 flex items-center gap-1">

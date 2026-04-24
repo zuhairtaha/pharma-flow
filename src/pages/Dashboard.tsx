@@ -10,7 +10,7 @@ import {
   invoiceTotalUsd,
   supplierDebtTotalUsd,
 } from '../utils/calc';
-import { expiryStatus, fmtDate, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
+import { expiryStatus, fmtDate, fmtExpiry, fmtInt, fmtNum, fmtSyp, fmtUsd } from '../utils/format';
 import type { Customer } from '../types';
 
 export default function Dashboard() {
@@ -205,7 +205,7 @@ export default function Dashboard() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold truncate">{p.name}</div>
                     <div className="text-xs text-[var(--color-on-surface-variant)]">
-                      {fmtDate(p.expiry)} · كمية {fmtInt(p.quantity)}
+                      {fmtExpiry(p.expiry)} · كمية {fmtInt(p.quantity)}
                     </div>
                   </div>
                   <Chip

@@ -7,6 +7,7 @@ import {
   EmptyState,
   IconButton,
   Modal,
+  NumberField,
   SectionHeader,
   Select,
   StatCard,
@@ -313,14 +314,13 @@ function DebtEditor({ debt, suppliers, exchangeRate, onClose, onSave }: DebtEdit
           options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
           className="md:col-span-2"
         />
-        <TextField
+        <NumberField
           label="المبلغ ($) *"
-          type="number"
-          step="0.01"
           icon="payments"
           value={form.amountUsd}
-          onChange={(e) => patch({ amountUsd: Number(e.target.value) || 0 })}
+          onChange={(v) => patch({ amountUsd: v })}
           suffix={`≈ ${fmtSyp((form.amountUsd || 0) * exchangeRate)}`}
+          min={0}
         />
         <TextField
           label="التاريخ"

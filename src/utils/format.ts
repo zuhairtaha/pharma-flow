@@ -18,6 +18,29 @@ const arDateShort = new Intl.DateTimeFormat('ar-SY-u-ca-gregory-nu-latn', {
   month: '2-digit',
   day: '2-digit',
 });
+const arMonthYear = new Intl.DateTimeFormat('ar-SY-u-ca-gregory-nu-latn', {
+  year: 'numeric',
+  month: 'long',
+});
+
+// يقبل الصلاحية بصيغتي YYYY-MM (شهر/سنة) أو YYYY-MM-DD؛ يُرجع آخر يوم من الشهر
+// لحساب المدة المتبقية — بما يطابق اصطلاح طباعة تاريخ الصلاحية على الأدوية.
+export function parseExpiry(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const monthOnly = /^(\d{4})-(\d{2})$/.exec(s);
+  if (monthOnly) {
+    const y = parseInt(monthOnly[1], 10);
+    const m = parseInt(monthOnly[2], 10);
+    // day = 0 من الشهر التالي ⇒ آخر يوم من الشهر الحالي
+    return new Date(y, m, 0);
+  }
+  const full = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (full) {
+    return new Date(parseInt(full[1], 10), parseInt(full[2], 10) - 1, parseInt(full[3], 10));
+  }
+  const fallback = new Date(s);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
 
 const isFinite = (n: Numeric): n is number | string =>
   n !== null && n !== undefined && Number.isFinite(Number(n));
@@ -45,10 +68,17 @@ export const fmtDateShort = (v: string | number | Date | null | undefined): stri
   return arDateShort.format(d);
 };
 
+// عرض الصلاحية بصيغة «شهر سنة» مثل "مايو 2026"
+export const fmtExpiry = (v: string | null | undefined): string => {
+  const d = parseExpiry(v);
+  if (!d) return '—';
+  return arMonthYear.format(d);
+};
+
 export const daysUntil = (dateStr: string | null | undefined): number | null => {
-  if (!dateStr) return null;
-  const target = new Date(dateStr);
-  if (Number.isNaN(target.getTime())) return null;
+  const parsed = parseExpiry(dateStr);
+  if (!parsed) return null;
+  const target = new Date(parsed);
   const now = new Date();
   target.setHours(0, 0, 0, 0);
   now.setHours(0, 0, 0, 0);

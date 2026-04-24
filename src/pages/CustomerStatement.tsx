@@ -8,6 +8,7 @@ import {
   Icon,
   IconButton,
   Modal,
+  NumberField,
   SectionHeader,
   Table,
   Td,
@@ -371,14 +372,13 @@ function AddPayment({ customerId, exchangeRate, onClose, onSave }: AddPaymentPro
       }
     >
       <div className="space-y-4">
-        <TextField
+        <NumberField
           label="المبلغ ($)"
-          type="number"
-          step="0.01"
           icon="payments"
           value={form.amountUsd}
-          onChange={(e) => patch({ amountUsd: Number(e.target.value) || 0 })}
+          onChange={(v) => patch({ amountUsd: v })}
           suffix={`≈ ${fmtSyp((form.amountUsd || 0) * exchangeRate)}`}
+          min={0}
         />
         <TextField
           label="التاريخ"

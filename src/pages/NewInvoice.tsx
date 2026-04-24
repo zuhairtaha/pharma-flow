@@ -6,6 +6,7 @@ import {
   EmptyState,
   Icon,
   IconButton,
+  NumberField,
   SectionHeader,
   Select,
   TextField,
@@ -396,25 +397,22 @@ export default function NewInvoice() {
               { value: 'credit', label: 'مدين (تسديد جزئي/آجل)' },
             ]}
           />
-          <TextField
+          <NumberField
             label="سعر الصرف وقت الفاتورة"
             icon="currency_exchange"
-            type="number"
             value={exchangeRate}
-            onChange={(e) => setExchangeRate(Number(e.target.value) || 0)}
+            onChange={(v) => setExchangeRate(v)}
             suffix="ل.س / $"
+            min={0}
           />
           {paymentType === 'credit' ? (
-            <TextField
+            <NumberField
               label="المبلغ المدفوع الآن ($)"
               icon="payments"
-              type="number"
-              step="0.01"
               value={paidUsd}
-              onChange={(e) =>
-                setPaidUsd(Math.min(totalUsd, Math.max(0, Number(e.target.value) || 0)))
-              }
+              onChange={(v) => setPaidUsd(Math.min(totalUsd, v))}
               suffix={`≈ ${fmtSyp(paidSyp)}`}
+              min={0}
             />
           ) : (
             <div className="p-3 rounded-xl bg-[var(--color-success-container)] text-[var(--color-success)] flex items-center gap-2">

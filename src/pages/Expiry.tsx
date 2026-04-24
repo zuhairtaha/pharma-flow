@@ -4,6 +4,7 @@ import {
   Chip,
   EmptyState,
   IconButton,
+  NumberField,
   SectionHeader,
   Select,
   StatCard,
@@ -17,6 +18,7 @@ import { bestSupplierPrice } from '../utils/calc';
 import {
   expiryStatus,
   fmtDate,
+  fmtExpiry,
   fmtInt,
   fmtNum,
   fmtSyp,
@@ -225,12 +227,12 @@ export default function Expiry() {
               { value: 'ok', label: 'صالح' },
             ]}
           />
-          <TextField
-            type="number"
+          <NumberField
             icon="event"
             value={thresholdDays}
-            onChange={(e) => setThresholdDays(Math.max(1, Number(e.target.value) || 90))}
+            onChange={(v) => setThresholdDays(v || 90)}
             suffix="يوم (العتبة)"
+            min={1}
           />
         </div>
       </Card>
@@ -277,7 +279,7 @@ export default function Expiry() {
                     </div>
                   </Td>
                   <Td align="center">
-                    <span className="text-sm">{fmtDate(p.expiry)}</span>
+                    <span className="text-sm">{fmtExpiry(p.expiry)}</span>
                   </Td>
                   <Td align="center">
                     <Chip

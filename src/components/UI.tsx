@@ -2,10 +2,12 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type ChangeEventHandler,
   type ElementType,
+  type FocusEvent,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -288,6 +290,88 @@ export function TextField(props: TextFieldProps) {
         <span className="block text-xs text-[var(--color-on-surface-variant)] mt-1">{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+// ---------- NumberField ----------
+// حقل رقمي يُظهر حقلاً فارغاً حين تكون القيمة 0، ويسمح بالفواصل العشرية
+// (النقطة أو الفاصلة) والأرقام العربية ٠-٩. عند الفقد (blur) يُقصّر/يُحدّد
+// الحدّ الأدنى/الأقصى ويستدعي onChange بالقيمة النهائية.
+
+const normalizeDigits = (s: string): string =>
+  s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+
+const parseNumeric = (raw: string): number => {
+  if (!raw) return NaN;
+  const normalized = normalizeDigits(raw).replace(/,/g, '.').trim();
+  return parseFloat(normalized);
+};
+
+const numberToDisplay = (n: number | null | undefined): string => {
+  if (n == null || Number.isNaN(n) || n === 0) return '';
+  return String(n);
+};
+
+export interface NumberFieldProps {
+  label?: string;
+  value: number;
+  onChange: (value: number) => void;
+  icon?: string;
+  suffix?: ReactNode;
+  hint?: ReactNode;
+  error?: ReactNode;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+}
+
+export function NumberField({
+  value,
+  onChange,
+  min,
+  max,
+  ...rest
+}: NumberFieldProps) {
+  const [local, setLocal] = useState<string>(() => numberToDisplay(value));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setLocal(numberToDisplay(value));
+    }
+  }, [value]);
+
+  return (
+    <TextField
+      {...rest}
+      type="text"
+      inputMode="decimal"
+      value={local}
+      onFocus={(e: FocusEvent<HTMLInputElement>) => {
+        focusedRef.current = true;
+        if (local) e.target.select();
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        let n = parseNumeric(local);
+        if (Number.isNaN(n)) n = 0;
+        if (min != null && n < min) n = min;
+        if (max != null && n > max) n = max;
+        setLocal(numberToDisplay(n));
+        onChange(n);
+      }}
+      onChange={(e) => {
+        const sanitized = normalizeDigits(e.target.value).replace(/[^\d.,-]/g, '');
+        setLocal(sanitized);
+        const n = parseNumeric(sanitized);
+        if (!Number.isNaN(n)) onChange(n);
+        else if (sanitized === '') onChange(0);
+      }}
+    />
   );
 }
 
