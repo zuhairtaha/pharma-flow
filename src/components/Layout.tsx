@@ -14,8 +14,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'لوحة التحكم', icon: 'dashboard' },
   { to: '/inventory', label: 'الأصناف', icon: 'inventory_2' },
   { to: '/expiry', label: 'الصلاحيات', icon: 'schedule' },
+  { to: '/purchases', label: 'فواتير الإدخال', icon: 'inventory' },
+  { to: '/purchases/new', label: 'فاتورة إدخال جديدة', icon: 'add_box' },
   { to: '/invoices', label: 'فواتير البيع', icon: 'receipt_long' },
-  { to: '/invoices/new', label: 'فاتورة جديدة', icon: 'add_shopping_cart' },
+  { to: '/invoices/new', label: 'فاتورة بيع جديدة', icon: 'add_shopping_cart' },
+  { to: '/profits', label: 'تقرير الأرباح', icon: 'trending_up' },
   { to: '/customers', label: 'الصيدليات/العملاء', icon: 'storefront' },
   { to: '/suppliers', label: 'الموردون', icon: 'local_shipping' },
   { to: '/debts', label: 'ديون الموردين', icon: 'credit_card' },
@@ -66,7 +69,12 @@ export default function Layout() {
         if (!data?.settings || !Array.isArray(data?.products)) {
           throw new Error('صيغة الملف غير متوافقة مع بنية التطبيق');
         }
-        setPendingImport(data as Database);
+        // إكمال الحقول الناقصة لضمان توافق ملفات النسخ الاحتياطي القديمة.
+        const filled: Database = {
+          ...data,
+          purchaseInvoices: Array.isArray(data.purchaseInvoices) ? data.purchaseInvoices : [],
+        };
+        setPendingImport(filled);
       } catch (err) {
         setImportError(err instanceof Error ? err.message : 'تعذّر قراءة الملف');
       }
@@ -169,7 +177,7 @@ export default function Layout() {
               <li key={item.to}>
                 <NavLink
                   to={item.to}
-                  end={item.to === '/invoices'}
+                  end={item.to === '/invoices' || item.to === '/purchases'}
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) => `
                     md-state group flex items-center gap-3 h-12 rounded-full transition-colors relative

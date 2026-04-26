@@ -9,6 +9,7 @@ import {
   type ElementType,
   type FocusEvent,
   type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
@@ -372,6 +373,194 @@ export function NumberField({
         else if (sanitized === '') onChange(0);
       }}
     />
+  );
+}
+
+// ---------- Autocomplete ----------
+// حقل نص مع قائمة اقتراحات تظهر أثناء الكتابة وتُملأ تلقائياً عند الاختيار
+// (مثل Excel). يُمرَّر له مصفوفة من القيم المرشّحة (مثل أسماء الموردين أو
+// الدول) وكل قيمة تُطابَق بطريقة "يبدأ بـ" ثم "يحتوي" بأولوية البداية.
+
+export interface AutocompleteProps {
+  label?: string;
+  icon?: string;
+  hint?: ReactNode;
+  error?: ReactNode;
+  placeholder?: string;
+  className?: string;
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  maxItems?: number;
+  disabled?: boolean;
+  // تنفّذ بعد اختيار اقتراح من القائمة (للاستفادة منها في تعبئة حقول مرتبطة)
+  onPick?: (value: string) => void;
+}
+
+export function Autocomplete({
+  label,
+  icon,
+  hint,
+  error,
+  placeholder,
+  className = '',
+  value,
+  onChange,
+  suggestions,
+  maxItems = 8,
+  disabled,
+  onPick,
+}: AutocompleteProps) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const filtered = (() => {
+    const q = value.trim().toLocaleLowerCase();
+    const uniques = Array.from(new Set(suggestions.filter(Boolean)));
+    if (!q) return uniques.slice(0, maxItems);
+    const starts: string[] = [];
+    const contains: string[] = [];
+    for (const s of uniques) {
+      const lower = s.toLocaleLowerCase();
+      if (lower === q) continue;
+      if (lower.startsWith(q)) starts.push(s);
+      else if (lower.includes(q)) contains.push(s);
+    }
+    return [...starts, ...contains].slice(0, maxItems);
+  })();
+
+  // إغلاق عند النقر خارج الحقل
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const pick = (val: string) => {
+    onChange(val);
+    onPick?.(val);
+    setOpen(false);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlight((h) => Math.min(filtered.length - 1, h + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === 'Enter') {
+      if (filtered[highlight] != null) {
+        e.preventDefault();
+        pick(filtered[highlight]);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    } else if (e.key === 'Tab') {
+      // إكمال تلقائي بأول اقتراح يبدأ بنفس النص (سلوك Excel/IDEs)
+      const q = value.trim().toLocaleLowerCase();
+      const first = filtered.find((s) => s.toLocaleLowerCase().startsWith(q));
+      if (q && first && first.toLocaleLowerCase() !== q) {
+        e.preventDefault();
+        pick(first);
+      }
+    }
+  };
+
+  return (
+    <div ref={wrapRef} className={`relative ${className}`}>
+      <label htmlFor={id} className="block">
+        {label ? (
+          <span className="block text-xs font-medium text-[var(--color-on-surface-variant)] mb-1.5">
+            {label}
+          </span>
+        ) : null}
+        <div
+          className={`relative flex items-stretch rounded-xl border bg-[var(--color-surface)]
+            ${
+              error
+                ? 'border-[var(--color-error)]'
+                : 'border-[var(--color-outline-variant)] focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-container)]'
+            }
+            transition-colors`}
+        >
+          {icon ? (
+            <span className="flex items-center px-3 text-[var(--color-on-surface-variant)]">
+              <Icon name={icon} className="text-[18px]" />
+            </span>
+          ) : null}
+          <input
+            id={id}
+            type="text"
+            autoComplete="off"
+            disabled={disabled}
+            value={value}
+            placeholder={placeholder}
+            onChange={(e) => {
+              onChange(e.target.value);
+              setOpen(true);
+              setHighlight(0);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={onKeyDown}
+            className="flex-1 bg-transparent outline-none h-11 px-3 text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)]/70"
+          />
+          {filtered.length > 0 ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setOpen((v) => !v)}
+              className="px-2 text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+              aria-label="عرض الاقتراحات"
+            >
+              <Icon name={open ? 'expand_less' : 'expand_more'} className="text-[18px]" />
+            </button>
+          ) : null}
+        </div>
+        {error ? (
+          <span className="block text-xs text-[var(--color-error)] mt-1">{error}</span>
+        ) : hint ? (
+          <span className="block text-xs text-[var(--color-on-surface-variant)] mt-1">{hint}</span>
+        ) : null}
+      </label>
+      {open && filtered.length > 0 ? (
+        <ul
+          role="listbox"
+          className="absolute z-30 right-0 left-0 mt-1 max-h-64 overflow-auto rounded-2xl border border-[var(--color-outline-variant)] bg-[var(--color-surface)] elev-3"
+        >
+          {filtered.map((s, i) => (
+            <li key={s + i}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === highlight}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(s)}
+                onMouseEnter={() => setHighlight(i)}
+                className={`w-full text-start px-3 py-2 text-sm md-state ${
+                  i === highlight
+                    ? 'bg-[var(--color-primary-container)]/60 text-[var(--color-on-primary-container)]'
+                    : 'text-[var(--color-on-surface)]'
+                }`}
+              >
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

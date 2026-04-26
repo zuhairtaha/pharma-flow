@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Button,
   Card,
   Chip,
@@ -19,6 +20,7 @@ import {
 import { useData } from '../store/DataContext';
 import {
   bestSupplierPrice,
+  findMatchingProduct,
   genId,
   sellPriceSyp,
   sellPriceUsd,
@@ -111,7 +113,33 @@ export default function Inventory() {
     if (prod.id && products.some((p) => p.id === prod.id)) {
       updateItem('products', prod.id, prod);
     } else {
-      addItem('products', { ...prod, id: prod.id || genId('p') });
+      // عند إضافة صنف جديد نتأكّد أنه لا يطابق صنفاً موجوداً (نفس الاسم
+      // والمصدر) — فإن طابق نُضيف الكمية للصنف الموجود وندمج الأسعار،
+      // بدلاً من إنشاء سجل مكرّر يقسم المخزون. هذا يحلّ مشكلة "D-Cure
+      // البلجيكي" حين تُضاف نفس البضاعة على دفعتين.
+      const match = findMatchingProduct(products, {
+        productId: '',
+        name: prod.name,
+        source: prod.source,
+      });
+      if (match) {
+        const mergedPrices = [...(match.prices ?? [])];
+        for (const np of prod.prices ?? []) {
+          const i = mergedPrices.findIndex((p) => p.supplierId === np.supplierId);
+          if (i >= 0) mergedPrices[i] = { ...mergedPrices[i], priceUsd: np.priceUsd };
+          else mergedPrices.push(np);
+        }
+        updateItem('products', match.id, {
+          quantity: (match.quantity || 0) + (prod.quantity || 0),
+          expiry: prod.expiry || match.expiry,
+          barcode: match.barcode || prod.barcode,
+          prices: mergedPrices,
+          profitDist: prod.profitDist || match.profitDist,
+          profitPharmacy: prod.profitPharmacy || match.profitPharmacy,
+        });
+      } else {
+        addItem('products', { ...prod, id: prod.id || genId('p') });
+      }
     }
     setEditing(null);
   };
@@ -414,12 +442,37 @@ interface ProductEditorProps {
 }
 
 function ProductEditor({ product, suppliers, settings, onClose, onSave }: ProductEditorProps) {
+  const { db } = useData();
+  const allProducts = db.products;
   const [form, setForm] = useState<ProductDraft>(() => ({
     ...product,
     prices: product.prices?.length ? product.prices : [],
   }));
 
   const patch = (p: Partial<ProductDraft>) => setForm((f) => ({ ...f, ...p }));
+
+  // اقتراحات للأسماء والمصادر تأتي من الأصناف الموجودة لتسهيل الكتابة
+  // وتوحيد التسميات (مثل "بلجيكا" دائماً بنفس الإملاء).
+  const nameSuggestions = useMemo(
+    () => Array.from(new Set(allProducts.map((p) => p.name).filter(Boolean))),
+    [allProducts],
+  );
+  const sourceSuggestions = useMemo(
+    () => Array.from(new Set(allProducts.map((p) => p.source).filter(Boolean))),
+    [allProducts],
+  );
+
+  // إن طابق الاسم+المصدر صنفاً موجوداً (وكنا في وضع الإضافة) ننبّه المستخدم
+  // أن الكمية ستُجمَع مع الموجود.
+  const matchedExisting = useMemo(() => {
+    if (form.id) return null;
+    const m = findMatchingProduct(allProducts, {
+      productId: '',
+      name: form.name,
+      source: form.source,
+    });
+    return m ?? null;
+  }, [allProducts, form.id, form.name, form.source]);
 
   const addPrice = () => {
     const usedIds = new Set(form.prices.map((p) => p.supplierId));
@@ -469,12 +522,31 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }: Produc
         </>
       }
     >
+      {matchedExisting ? (
+        <div className="mb-4 p-3 rounded-2xl bg-[var(--color-success-container)] text-[var(--color-success)] flex items-start gap-2 text-sm">
+          <Icon name="merge_type" filled />
+          <div>
+            <div className="font-semibold">يطابق صنفاً موجوداً</div>
+            <div className="text-xs">
+              "{matchedExisting.name}" — كمية حالية {matchedExisting.quantity || 0} {matchedExisting.unit}.
+              عند الحفظ ستُجمع الكمية مع الموجود بدلاً من إنشاء صنف مكرّر.
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TextField
+        <Autocomplete
           label="اسم الصنف *"
           icon="medication"
           value={form.name}
-          onChange={(e) => patch({ name: e.target.value })}
+          onChange={(v) => patch({ name: v })}
+          onPick={(v) => {
+            // عند اختيار اسم موجود نُكمل المصدر/الوحدة تلقائياً للسماح
+            // بإضافة كمية للصنف الموجود مباشرة.
+            const m = allProducts.find((p) => p.name === v);
+            if (m) patch({ name: v, source: form.source || m.source, unit: m.unit || form.unit });
+          }}
+          suggestions={nameSuggestions}
           placeholder="مثال: باراسيتامول 500 ملغ"
         />
         <TextField
@@ -484,11 +556,12 @@ function ProductEditor({ product, suppliers, settings, onClose, onSave }: Produc
           onChange={(e) => patch({ barcode: e.target.value })}
           placeholder="6221..."
         />
-        <TextField
+        <Autocomplete
           label="المصدر / بلد المنشأ"
           icon="public"
           value={form.source}
-          onChange={(e) => patch({ source: e.target.value })}
+          onChange={(v) => patch({ source: v })}
+          suggestions={sourceSuggestions}
           placeholder="سوريا"
         />
         <Select

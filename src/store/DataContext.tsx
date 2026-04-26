@@ -12,12 +12,36 @@ import type { CollectionItem, CollectionName, Database, Settings } from '../type
 
 // قاعدة بيانات JSON مستمرة عبر localStorage — تعمل كـ"ملف JSON" للتطبيق.
 // عند تغيير شكل البيانات (رفع الإصدار) يُتجاهل المحتوى القديم ويُحمَّل الـ seed الجديد.
-const STORAGE_KEY = 'pharmaflow.db.v5';
+const STORAGE_KEY = 'pharmaflow.db.v6';
+const LEGACY_KEYS = ['pharmaflow.db.v5'];
+
+// يضمن أن قاعدة البيانات المُحمَّلة تحتوي على كل الحقول المطلوبة. عند ترقية
+// النموذج (إضافة مجموعة جديدة مثل purchaseInvoices) لا نريد فقدان بيانات
+// المستخدم — نملأ الحقول الناقصة بقوائم فارغة.
+const normalize = (raw: Partial<Database>): Database => ({
+  settings: { ...seedData.settings, ...(raw.settings ?? {}) },
+  suppliers: raw.suppliers ?? [],
+  customers: raw.customers ?? [],
+  products: raw.products ?? [],
+  invoices: raw.invoices ?? [],
+  purchaseInvoices: raw.purchaseInvoices ?? [],
+  supplierDebts: raw.supplierDebts ?? [],
+  customerPayments: raw.customerPayments ?? [],
+});
 
 const loadDb = (): Database => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as Database;
+    if (raw) return normalize(JSON.parse(raw));
+    // ترحيل تلقائي من إصدارات سابقة
+    for (const k of LEGACY_KEYS) {
+      const legacy = localStorage.getItem(k);
+      if (legacy) {
+        const data = normalize(JSON.parse(legacy));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return data;
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -137,6 +161,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       customers: [],
       products: [],
       invoices: [],
+      purchaseInvoices: [],
       supplierDebts: [],
       customerPayments: [],
     }));
@@ -157,6 +182,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       customers: merge(prev.customers, imported.customers),
       products: merge(prev.products, imported.products),
       invoices: merge(prev.invoices, imported.invoices),
+      purchaseInvoices: merge(prev.purchaseInvoices, imported.purchaseInvoices),
       supplierDebts: merge(prev.supplierDebts, imported.supplierDebts),
       customerPayments: merge(prev.customerPayments, imported.customerPayments),
     }));
@@ -164,7 +190,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // استبدال كامل بمحتوى الملف المستورد (بما فيه الإعدادات).
   const replaceImport = useCallback((imported: Database) => {
-    setDb(imported);
+    setDb(normalize(imported));
   }, []);
 
   const exportJson = useCallback(() => JSON.stringify(db, null, 2), [db]);

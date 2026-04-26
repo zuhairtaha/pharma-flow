@@ -85,12 +85,36 @@ export interface CustomerPayment {
   note: string;
 }
 
+// عنصر في فاتورة إدخال من مورد — يحمل معرّف الصنف إن وُجد مسبقاً، وإلا
+// تُؤخذ بياناته (الاسم/المصدر/الوحدة) لإنشاء صنف جديد عند الحفظ.
+export interface PurchaseInvoiceItem {
+  productId: string; // قد يكون فارغاً للأصناف الجديدة
+  name: string;
+  source: string;
+  unit: string;
+  expiry: string; // YYYY-MM (اختياري)
+  quantity: number;
+  costUsd: number;
+}
+
+export interface PurchaseInvoice {
+  id: string;
+  number: string;
+  supplierId: string;
+  date: string;
+  exchangeRate: number;
+  items: PurchaseInvoiceItem[];
+  paidUsd: number;
+  notes: string;
+}
+
 export interface Database {
   settings: Settings;
   suppliers: Supplier[];
   customers: Customer[];
   products: Product[];
   invoices: Invoice[];
+  purchaseInvoices: PurchaseInvoice[];
   supplierDebts: SupplierDebt[];
   customerPayments: CustomerPayment[];
 }
@@ -101,6 +125,7 @@ export type CollectionName =
   | 'customers'
   | 'products'
   | 'invoices'
+  | 'purchaseInvoices'
   | 'supplierDebts'
   | 'customerPayments';
 

@@ -7,6 +7,7 @@ import type {
   Database,
   Invoice,
   Product,
+  PurchaseInvoice,
   Settings,
   Supplier,
   SupplierDebt,
@@ -29,6 +30,7 @@ export const customers: Customer[] = [];
 export const products: Product[] = [];
 export const supplierDebts: SupplierDebt[] = [];
 export const invoices: Invoice[] = [];
+export const purchaseInvoices: PurchaseInvoice[] = [];
 export const customerPayments: CustomerPayment[] = [];
 
 const seedData: Database = {
@@ -37,6 +39,7 @@ const seedData: Database = {
   customers,
   products,
   invoices,
+  purchaseInvoices,
   supplierDebts,
   customerPayments,
 };

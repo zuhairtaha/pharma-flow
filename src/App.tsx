@@ -9,6 +9,9 @@ import CustomerStatement from './pages/CustomerStatement';
 import Invoices from './pages/Invoices';
 import NewInvoice from './pages/NewInvoice';
 import InvoiceView from './pages/InvoiceView';
+import PurchaseInvoices from './pages/PurchaseInvoices';
+import NewPurchaseInvoice from './pages/NewPurchaseInvoice';
+import Profits from './pages/Profits';
 import Expiry from './pages/Expiry';
 import Debts from './pages/Debts';
 import Settings from './pages/Settings';
@@ -30,6 +33,10 @@ export default function App() {
             <Route path="invoices" element={<Invoices />} />
             <Route path="invoices/new" element={<NewInvoice />} />
             <Route path="invoices/:id" element={<InvoiceView />} />
+            <Route path="purchases" element={<PurchaseInvoices />} />
+            <Route path="purchases/new" element={<NewPurchaseInvoice />} />
+            <Route path="purchases/:id/edit" element={<NewPurchaseInvoice />} />
+            <Route path="profits" element={<Profits />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
